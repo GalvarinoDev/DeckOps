@@ -1,0 +1,18 @@
+[Desktop Entry]
+Comment[en_US]=
+Comment=
+Exec=sh -c 'curl -sL https://raw.githubusercontent.com/GalvarinoDev/DeckOps/main/deckops_uninstall.sh | bash'
+GenericName[en_US]=
+GenericName=
+MimeType=
+Name[en]=Uninstall DeckOps
+Name=Uninstall DeckOps
+Path=
+StartupNotify=false
+Terminal=true
+TerminalOptions=
+Type=Application
+X-DBUS-ServiceName=
+X-DBUS-StartupType=
+X-KDE-SubstituteUID=false
+X-KDE-Username=
