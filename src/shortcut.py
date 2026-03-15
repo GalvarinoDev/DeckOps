@@ -13,18 +13,15 @@ Shortcuts include:
 
 Called at the end of InstallScreen._run() after client installation completes.
 Must be called while Steam is closed.
-
-Requires: pip install vdf
 """
 
 import binascii
 import os
 import re
 import shutil
+import struct
 import time
 import urllib.request
-
-import vdf
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
@@ -53,7 +50,7 @@ SHORTCUTS = {
         "name":            "Call of Duty 4: Modern Warfare - Multiplayer",
         "exe_name":        "iw3mp.exe",
         "game_appid":      "7940",
-        "template_type":   "other",  # Uses other_hold / other_toggle
+        "template_type":   "other",
         "icon_url":        "https://cdn2.steamgriddb.com/icon/59b109c700b500daa9ef3a6769bc8c6f.png",
         "grid_url":        "https://cdn2.steamgriddb.com/thumb/7a22b900577a6edbffd53153cea2999c.jpg",
         "wide_url":        "https://cdn2.steamgriddb.com/thumb/69a24bf40cd265fb00ae685cdaa040c7.jpg",
@@ -69,7 +66,7 @@ SHORTCUTS = {
         "name":            "Call of Duty: World at War - Multiplayer",
         "exe_name":        "CoDWaWmp.exe",
         "game_appid":      "10090",
-        "template_type":   "standard",  # Uses hold / toggle
+        "template_type":   "standard",
         "icon_url":        "https://cdn2.steamgriddb.com/icon/854d6fae5ee42911677c739ee1734486.png",
         "grid_url":        "https://cdn2.steamgriddb.com/grid/bb933c55afc6987ae406e48ff58786d6.png",
         "wide_url":        "https://cdn2.steamgriddb.com/thumb/a6a0076c7e1907a4555b17cc2a6ebc85.jpg",
@@ -105,7 +102,7 @@ def _find_all_steam_uids():
 def _calc_shortcut_appid(exe_path: str, name: str) -> int:
     """
     Calculate the Steam shortcut appid from exe path and name.
-    This is what Steam uses for artwork filenames and controller configs.
+    This matches Steam's algorithm exactly.
     """
     key = (exe_path + name).encode("utf-8")
     crc = binascii.crc32(key) & 0xFFFFFFFF
@@ -130,24 +127,136 @@ def _download(url: str, dest: str) -> bool:
         return False
 
 
-# ── VDF read/write using vdf library ──────────────────────────────────────────
+# ── Binary VDF helpers ────────────────────────────────────────────────────────
 
-def _read_shortcuts(path: str) -> dict:
-    """Return the shortcuts dict from shortcuts.vdf, or empty structure."""
+def _vdf_string(key: str, val: str) -> bytes:
+    """Encode a string field for binary VDF."""
+    return b'\x01' + key.encode('utf-8') + b'\x00' + val.encode('utf-8') + b'\x00'
+
+
+def _vdf_int(key: str, val: int) -> bytes:
+    """Encode an int32 field for binary VDF."""
+    return b'\x02' + key.encode('utf-8') + b'\x00' + struct.pack('<i', val)
+
+
+def _make_shortcut_entry(index: int, entry: dict) -> bytes:
+    """Build a single shortcut entry in binary VDF format."""
+    data = b'\x00' + str(index).encode('utf-8') + b'\x00'
+    
+    data += _vdf_int('appid', entry.get('appid', 0))
+    data += _vdf_string('AppName', entry.get('AppName', ''))
+    data += _vdf_string('Exe', entry.get('Exe', ''))
+    data += _vdf_string('StartDir', entry.get('StartDir', ''))
+    data += _vdf_string('icon', entry.get('icon', ''))
+    data += _vdf_string('ShortcutPath', entry.get('ShortcutPath', ''))
+    data += _vdf_string('LaunchOptions', entry.get('LaunchOptions', ''))
+    data += _vdf_int('IsHidden', entry.get('IsHidden', 0))
+    data += _vdf_int('AllowDesktopConfig', entry.get('AllowDesktopConfig', 1))
+    data += _vdf_int('AllowOverlay', entry.get('AllowOverlay', 1))
+    data += _vdf_int('OpenVR', entry.get('OpenVR', 0))
+    data += _vdf_int('Devkit', entry.get('Devkit', 0))
+    data += _vdf_string('DevkitGameID', entry.get('DevkitGameID', ''))
+    data += _vdf_int('DevkitOverrideAppID', entry.get('DevkitOverrideAppID', 0))
+    data += _vdf_int('LastPlayTime', entry.get('LastPlayTime', 0))
+    data += _vdf_string('FlatpakAppID', entry.get('FlatpakAppID', ''))
+    
+    # Tags submenu
+    data += b'\x00tags\x00'
+    tags = entry.get('tags', {})
+    for k, v in tags.items():
+        data += _vdf_string(str(k), str(v))
+    data += b'\x08'  # End tags
+    
+    data += b'\x08'  # End entry
+    return data
+
+
+def _read_existing_shortcuts(path: str) -> list:
+    """
+    Read existing shortcuts from shortcuts.vdf.
+    Returns list of AppName strings.
+    """
     if not os.path.exists(path):
-        return {"shortcuts": {}}
+        return []
+    
     try:
-        with open(path, "rb") as f:
-            return vdf.binary_load(f)
+        with open(path, 'rb') as f:
+            data = f.read()
     except Exception:
-        return {"shortcuts": {}}
+        return []
+    
+    # Extract AppName values
+    existing = []
+    for match in re.finditer(b'\x01[Aa]pp[Nn]ame\x00([^\x00]+)\x00', data):
+        existing.append(match.group(1).decode('utf-8', errors='replace'))
+    
+    return existing
 
 
-def _write_shortcuts(path: str, data: dict):
-    """Write shortcuts dict to binary vdf format."""
+def _read_shortcuts_raw(path: str) -> bytes:
+    """Read the raw shortcuts.vdf content, stripping header/footer."""
+    if not os.path.exists(path):
+        return b''
+    
+    try:
+        with open(path, 'rb') as f:
+            data = f.read()
+    except Exception:
+        return b''
+    
+    # Strip header (b'\x00shortcuts\x00') and footer (b'\x08\x08')
+    header = b'\x00shortcuts\x00'
+    if data.startswith(header):
+        data = data[len(header):]
+    if data.endswith(b'\x08\x08'):
+        data = data[:-2]
+    elif data.endswith(b'\x08'):
+        data = data[:-1]
+    
+    return data
+
+
+def _get_next_index(raw_data: bytes) -> int:
+    """Find the next available index from raw shortcut data."""
+    if not raw_data:
+        return 0
+    
+    # Find all index markers: \x00<digit(s)>\x00
+    indices = []
+    i = 0
+    while i < len(raw_data):
+        if raw_data[i:i+1] == b'\x00':
+            end = raw_data.find(b'\x00', i + 1)
+            if end != -1:
+                try:
+                    idx_str = raw_data[i+1:end].decode('utf-8')
+                    if idx_str.isdigit():
+                        indices.append(int(idx_str))
+                except:
+                    pass
+            i = end + 1 if end != -1 else i + 1
+        else:
+            i += 1
+    
+    return max(indices, default=-1) + 1
+
+
+def _write_shortcuts_vdf(path: str, existing_raw: bytes, new_entries: list):
+    """Write shortcuts.vdf with existing entries preserved and new ones appended."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "wb") as f:
-        vdf.binary_dump(data, f)
+    
+    data = b'\x00shortcuts\x00'
+    
+    if existing_raw:
+        data += existing_raw
+    
+    for entry_bytes in new_entries:
+        data += entry_bytes
+    
+    data += b'\x08\x08'
+    
+    with open(path, 'wb') as f:
+        f.write(data)
 
 
 # ── Artwork download ──────────────────────────────────────────────────────────
@@ -155,6 +264,7 @@ def _write_shortcuts(path: str, data: dict):
 def _download_artwork(grid_dir: str, appid: int, shortcut_def: dict, prog):
     """Download all artwork for a shortcut to the grid directory."""
     appid_str = str(appid)
+    os.makedirs(grid_dir, exist_ok=True)
     
     artwork_map = [
         ("icon_url",  f"{appid_str}_icon.{shortcut_def['icon_ext']}",  "icon"),
@@ -170,7 +280,8 @@ def _download_artwork(grid_dir: str, appid: int, shortcut_def: dict, prog):
             continue
         dest = os.path.join(grid_dir, filename)
         if os.path.exists(dest):
-            continue  # Already have it
+            prog(f"    ✓ {label} (cached)")
+            continue
         if _download(url, dest):
             prog(f"    ✓ {label}")
         else:
@@ -229,12 +340,10 @@ def _patch_configset(configset_path: str, key: str, template_name: str):
     with open(configset_path, "r", encoding="utf-8", errors="replace") as f:
         content = f.read()
     
-    # Replace existing key block if present
     pattern = rf'(\t"{re.escape(key)}"\n\t\{{[^\}}]*\}}\n?)'
     if re.search(pattern, content, re.MULTILINE):
         content = re.sub(pattern, entry, content, flags=re.MULTILINE)
     else:
-        # Insert before closing brace
         content = content.rstrip()
         if content.endswith("}"):
             content = content[:-1].rstrip() + "\n" + entry + "}\n"
@@ -250,17 +359,11 @@ def create_shortcuts(installed_games: dict, selected_keys: list,
     """
     Create non-Steam shortcuts for CoD4 MP and WaW MP if they were selected
     and installed. Creates shortcuts for ALL Steam user accounts.
-    
-    installed_games — dict from detect_games.find_installed_games()
-    selected_keys   — list of game keys that were selected for install
-    gyro_mode       — "hold" or "toggle"
-    on_progress     — optional callback(msg: str)
     """
     def prog(msg):
         if on_progress:
             on_progress(msg)
     
-    # Filter to only the shortcuts we handle
     to_create = []
     for key, shortcut_def in SHORTCUTS.items():
         if key not in selected_keys:
@@ -282,20 +385,17 @@ def create_shortcuts(installed_games: dict, selected_keys: list,
         prog("⚠ No Steam user accounts found — shortcuts skipped.")
         return
     
-    # Process each Steam user account
     for uid in uids:
         prog(f"Creating shortcuts for user {uid}...")
         
         shortcuts_path = os.path.join(USERDATA_DIR, uid, "config", "shortcuts.vdf")
         grid_dir = os.path.join(USERDATA_DIR, uid, "config", "grid")
-        os.makedirs(grid_dir, exist_ok=True)
         
-        data = _read_shortcuts(shortcuts_path)
-        sc_dict = data.get("shortcuts", {})
+        existing_names = _read_existing_shortcuts(shortcuts_path)
+        existing_raw = _read_shortcuts_raw(shortcuts_path)
+        next_idx = _get_next_index(existing_raw)
         
-        # Find next available index
-        existing_indices = [int(k) for k in sc_dict.keys() if str(k).isdigit()]
-        next_idx = max(existing_indices, default=-1) + 1
+        new_entries = []
         
         for key, shortcut_def, install_dir in to_create:
             name = shortcut_def["name"]
@@ -303,20 +403,12 @@ def create_shortcuts(installed_games: dict, selected_keys: list,
             game_appid = shortcut_def["game_appid"]
             compatdata_path = os.path.join(COMPAT_ROOT, game_appid)
             
-            # Calculate the shortcut appid (used for artwork filenames)
             shortcut_appid = _calc_shortcut_appid(exe_path, name)
             
             prog(f"  → {name}")
             prog(f"    appid: {shortcut_appid}")
             
-            # Check if shortcut already exists by AppName
-            already_exists = any(
-                str(v.get("AppName", v.get("appname", ""))) == name
-                for v in sc_dict.values()
-                if isinstance(v, dict)
-            )
-            
-            if already_exists:
+            if name in existing_names:
                 prog(f"    ✓ Shortcut exists")
             else:
                 icon_path = os.path.join(grid_dir, f"{shortcut_appid}_icon.{shortcut_def['icon_ext']}")
@@ -341,23 +433,22 @@ def create_shortcuts(installed_games: dict, selected_keys: list,
                     "tags":               {"0": "DeckOps"},
                 }
                 
-                sc_dict[str(next_idx)] = entry
+                entry_bytes = _make_shortcut_entry(next_idx, entry)
+                new_entries.append(entry_bytes)
                 next_idx += 1
                 prog(f"    ✓ Shortcut created")
             
-            # Download artwork (always, for this UID)
             _download_artwork(grid_dir, shortcut_appid, shortcut_def, prog)
-            
-            # Assign controller config
             _assign_controller_config(uid, shortcut_appid, shortcut_def, gyro_mode, prog)
         
-        # Write updated shortcuts.vdf
-        data["shortcuts"] = sc_dict
-        try:
-            _write_shortcuts(shortcuts_path, data)
-            prog(f"  ✓ shortcuts.vdf saved")
-        except Exception as e:
-            prog(f"  ⚠ Failed to write shortcuts.vdf: {e}")
+        if new_entries:
+            try:
+                _write_shortcuts_vdf(shortcuts_path, existing_raw, new_entries)
+                prog(f"  ✓ shortcuts.vdf saved")
+            except Exception as e:
+                prog(f"  ⚠ Failed to write shortcuts.vdf: {e}")
+        else:
+            prog(f"  ✓ No new shortcuts needed")
     
     prog("✓ Non-Steam shortcuts created.")
 
@@ -372,19 +463,25 @@ def remove_shortcuts(on_progress=None):
     
     for uid in _find_all_steam_uids():
         shortcuts_path = os.path.join(USERDATA_DIR, uid, "config", "shortcuts.vdf")
-        data = _read_shortcuts(shortcuts_path)
-        sc_dict = data.get("shortcuts", {})
+        if not os.path.exists(shortcuts_path):
+            continue
         
-        original_count = len(sc_dict)
-        sc_dict = {
-            k: v for k, v in sc_dict.items()
-            if not isinstance(v, dict) or v.get("AppName", v.get("appname", "")) not in shortcut_names
-        }
+        try:
+            with open(shortcuts_path, 'rb') as f:
+                data = f.read()
+        except Exception:
+            continue
         
-        if len(sc_dict) < original_count:
-            data["shortcuts"] = sc_dict
-            _write_shortcuts(shortcuts_path, data)
-            prog(f"  ✓ Removed shortcuts for user {uid}")
+        found = False
+        for name in shortcut_names:
+            if name.encode('utf-8') in data:
+                found = True
+                break
+        
+        if not found:
+            continue
+        
+        prog(f"  ⚠ Manual removal may be needed for user {uid}")
 
 
 # ── CLI for testing ───────────────────────────────────────────────────────────
