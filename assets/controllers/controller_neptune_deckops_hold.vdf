@@ -476,7 +476,7 @@
 		"settings"
 		{
 			"gyro_button"		"7"
-			"gyro_button_invert"		"0"
+			"gyro_button_invert"		"1"
 		}
 	}
 	"preset"
