@@ -455,8 +455,8 @@ class SetupScreen(QWidget):
             
             if not prefix_ready:
                 # Show launch warning
-                warn = _lbl("⚠ Launch through Steam first", 11, C_TREY, align=Qt.AlignRight, wrap=False)
-                warn.setFixedWidth(180); row.addWidget(warn)
+                warn = _lbl("⚠ Launch in Steam first", 11, C_TREY, align=Qt.AlignRight, wrap=False)
+                warn.setFixedWidth(160); row.addWidget(warn)
             elif done:
                 tick = _lbl("✓ set up", 12, C_IW, align=Qt.AlignRight, wrap=False)
                 tick.setFixedWidth(80); row.addWidget(tick)
@@ -1051,8 +1051,8 @@ class ControllerInfoScreen(QWidget):
         wl = QVBoxLayout(warn_frame); wl.setContentsMargins(16,12,16,12); wl.setSpacing(8)
         wl.addWidget(_lbl("⚠  IMPORTANT", 13, C_TREY, bold=True, align=Qt.AlignLeft))
         wl.addWidget(_lbl(
-            "On first launch, if Steam says your cloud save is out of sync, choose Keep Local.\n"
-            "If any Call of Duty game asks to start in Safe Mode or override your configuration, choose No.",
+            "Launch Steam in Desktop Mode before switching to Game Mode.\n"
+            "If Steam asks about cloud saves, choose Keep Local. If a game asks for Safe Mode, choose No.",
             12, "#CCC", align=Qt.AlignLeft))
         lay.addWidget(warn_frame)
         lay.addSpacing(4)
@@ -1151,9 +1151,6 @@ class ConfigureScreen(QWidget):
         lay.addWidget(_hdiv())
 
         lay.addWidget(_lbl("Shortcuts & Proton", 14, "#CCC", align=Qt.AlignLeft))
-        lay.addWidget(_lbl(
-            "Repair non-Steam shortcuts (CoD4 MP, WaW MP) — re-applies GE-Proton, artwork, and controller configs.",
-            11, C_DIM, align=Qt.AlignLeft))
         sr = QHBoxLayout(); sr.setSpacing(12)
         shortcut_btn = _btn("Repair Shortcuts", C_DARK_BTN, size=12, h=40)
         shortcut_btn.clicked.connect(self._repair_shortcuts)
@@ -1279,7 +1276,6 @@ class ConfigureScreen(QWidget):
                 from shortcut import create_shortcuts, SHORTCUTS
                 from wrapper import set_steam_input_enabled
                 
-                # Find installed games
                 steam_root = cfg.load().get("steam_root", "") or find_steam_root()
                 if not steam_root:
                     s.log.emit("✗  Steam not found.")
@@ -1289,7 +1285,6 @@ class ConfigureScreen(QWidget):
                 libs = parse_library_folders(steam_root)
                 installed = find_installed_games(libs)
                 
-                # Get keys for shortcuts that are installed
                 shortcut_keys = [k for k in SHORTCUTS.keys() if k in installed]
                 if not shortcut_keys:
                     s.log.emit("No shortcut-eligible games found.")
@@ -1303,8 +1298,6 @@ class ConfigureScreen(QWidget):
                     gyro_mode=gyro_mode,
                     on_progress=lambda msg: s.log.emit(msg)
                 )
-                
-                # Also re-enable Steam Input
                 set_steam_input_enabled(steam_root)
                 s.done.emit(True)
             except Exception as ex:
