@@ -519,6 +519,25 @@ for f in \
 done
 echo ""
 
+info "Removing DeckOps controller templates from Steam..."
+
+TEMPLATES_DIR="$HOME/.steam/steam/controller_base/templates"
+DECKOPS_TEMPLATES=(
+    "controller_neptune_deckops_hold.vdf"
+    "controller_neptune_deckops_toggle.vdf"
+    "controller_neptune_deckops_other_hold.vdf"
+    "controller_neptune_deckops_other_toggle.vdf"
+)
+
+for tpl in "${DECKOPS_TEMPLATES[@]}"; do
+    if [ -f "$TEMPLATES_DIR/$tpl" ]; then
+        rm -f "$TEMPLATES_DIR/$tpl" && success "Removed $tpl" || warn "Failed to remove $tpl"
+    else
+        skip "$tpl not found"
+    fi
+done
+echo ""
+
 info "Removing per-game controller configs..."
 
 python3 - << 'PYEOF'
@@ -526,12 +545,31 @@ import os, shutil, re, binascii, glob
 
 STEAM_DIR = os.path.expanduser("~/.local/share/Steam")
 USERDATA  = os.path.join(STEAM_DIR, "userdata")
+STEAM_CONFIG = os.path.join(STEAM_DIR, "config", "config.vdf")
 
 # Standard Steam appids managed by DeckOps
 MANAGED_STEAM_APPIDS = [
     "7940", "10090", "10180", "10190", "42680", "42690",
     "42700", "42710", "202970", "202990", "212910",
 ]
+
+# Named game keys used in configset files — must match controller_profiles.py
+APPID_NAMED_KEYS = {
+    "7940":   ["call of duty 4 modern warfare (2007)",
+               "call of duty 4 modern warfare - multiplayer"],
+    "10090":  ["call of duty world at war",
+               "call of duty world at war - multiplayer"],
+    "10180":  ["call of duty modern warfare 2 (2009) - multiplayer"],
+    "10190":  ["call of duty modern warfare 2 (2009) - multiplayer"],
+    "42680":  ["call of duty modern warfare 3 - multiplayer"],
+    "42690":  ["call of duty modern warfare 3 - multiplayer"],
+    "42700":  ["call of duty black ops",
+               "call of duty black ops - zombies"],
+    "42710":  ["call of duty black ops - multiplayer"],
+    "202970": [],
+    "202990": ["call of duty black ops ii - multiplayer"],
+    "212910": ["call of duty black ops ii - zombies"],
+}
 
 # Shortcut definitions — must match shortcut.py
 SHORTCUTS = {
@@ -546,6 +584,20 @@ SHORTCUTS = {
         "game_appid": "10090",
     },
 }
+
+def get_deck_serial():
+    """Read the Steam Deck serial number from Steam's config.vdf."""
+    if not os.path.exists(STEAM_CONFIG):
+        return None
+    try:
+        with open(STEAM_CONFIG, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+        match = re.search(r'"SteamDeckRegisteredSerialNumber"\s+"([^"]+)"', content)
+        if match:
+            return match.group(1)
+    except Exception:
+        pass
+    return None
 
 def find_install_dir(steam_root, appid):
     """Find the install directory for a Steam appid."""
@@ -576,6 +628,25 @@ def calc_shortcut_appid(exe_path, name):
     crc = binascii.crc32(key) & 0xFFFFFFFF
     return str((crc | 0x80000000) & 0xFFFFFFFF)
 
+def clean_configset(configset_path, keys_to_remove):
+    """Remove all matching keys from a configset file."""
+    if not os.path.exists(configset_path):
+        return False
+    
+    with open(configset_path, "r", encoding="utf-8", errors="replace") as f:
+        content = f.read()
+    
+    original = content
+    for key in keys_to_remove:
+        pattern = rf'\t"{re.escape(key)}"\n\t\{{[^\}}]*\}}\n?'
+        content = re.sub(pattern, "", content, flags=re.MULTILINE)
+    
+    if content != original:
+        with open(configset_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return True
+    return False
+
 if not os.path.isdir(USERDATA):
     print("  No Steam userdata found — skipping.")
     exit(0)
@@ -589,6 +660,17 @@ for key, info in SHORTCUTS.items():
         exe_path = os.path.join(install_dir, info["exe_name"])
         appid = calc_shortcut_appid(exe_path, info["name"])
         all_appids.add(appid)
+
+# Build list of all keys to remove from configset files (appids + named keys)
+all_configset_keys = set(all_appids)
+for appid in MANAGED_STEAM_APPIDS:
+    for named_key in APPID_NAMED_KEYS.get(appid, []):
+        all_configset_keys.add(named_key)
+
+# Get Deck serial for serial-specific configset cleanup
+deck_serial = get_deck_serial()
+if deck_serial:
+    print(f"  Deck serial: {deck_serial}")
 
 for uid in os.listdir(USERDATA):
     if not uid.isdigit() or int(uid) < 10000:
@@ -615,20 +697,15 @@ for uid in os.listdir(USERDATA):
                 shutil.rmtree(appid_dir)
                 print(f"  uid {uid}: removed Steam Controller Config for appid {appid}")
         
-        # Also clean configset files
-        for configset in ["configset_controller_neptune.vdf"]:
+        # Clean configset files (neptune + serial-specific)
+        configsets_to_clean = ["configset_controller_neptune.vdf"]
+        if deck_serial:
+            configsets_to_clean.append(f"configset_{deck_serial}.vdf")
+        
+        for configset in configsets_to_clean:
             configset_path = os.path.join(steam_cfg_root, configset)
-            if os.path.exists(configset_path):
-                with open(configset_path, "r", encoding="utf-8", errors="replace") as f:
-                    content = f.read()
-                original = content
-                for appid in all_appids:
-                    pattern = rf'\t"{re.escape(appid)}"\n\t\{{[^\}}]*\}}\n?'
-                    content = re.sub(pattern, "", content, flags=re.MULTILINE)
-                if content != original:
-                    with open(configset_path, "w", encoding="utf-8") as f:
-                        f.write(content)
-                    print(f"  uid {uid}: cleaned {configset}")
+            if clean_configset(configset_path, all_configset_keys):
+                print(f"  uid {uid}: cleaned {configset}")
 PYEOF
 
 success "Per-game controller configs removed."
@@ -744,6 +821,7 @@ echo ""
 echo "  Your Steam games are untouched. All original .exe files restored."
 echo "  All Plutonium data removed from Wine prefixes."
 echo "  All IW3SP-MOD files removed from CoD4 folder."
+echo "  All DeckOps controller templates and profiles removed."
 echo ""
 
 info "Relaunching Steam..."
@@ -754,7 +832,7 @@ echo ""
 # Show summary dialog in background while countdown runs in terminal
 zenity --info \
     --title="DeckOps Uninstaller" \
-    --text="DeckOps fully uninstalled.\n\nYour Steam games are untouched. All original .exe files restored.\nAll Plutonium data removed from Wine prefixes.\nAll IW3SP-MOD files removed from CoD4 folder." \
+    --text="DeckOps fully uninstalled.\n\nYour Steam games are untouched. All original .exe files restored.\nAll Plutonium data removed from Wine prefixes.\nAll IW3SP-MOD files removed from CoD4 folder.\nAll DeckOps controller templates and profiles removed." \
     --timeout=6 \
     2>/dev/null &
 
