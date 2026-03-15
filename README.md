@@ -33,24 +33,20 @@ DeckOps automates the installation of iw4x, CoD4x, IW3SP-MOD, and Plutonium on S
 ## Requirements
 
 - Steam Deck running SteamOS
-- Each game installed through Steam and launched at least once in both SP and MP modes before running DeckOps
+- Each game installed through Steam and launched at least once (both SP and MP modes)
 - Plutonium games require a free account at [plutonium.pw](https://plutonium.pw)
 
-> Skipping the first-launch step is the #1 cause of install failures. It creates the Proton prefix and starts shader cache downloads.
+> DeckOps will show which games haven't been launched yet and prevent you from selecting them until ready.
 
 ---
 
-## How It Works
+## ⚠️ After Installation
 
-DeckOps is a setup and management tool, not a launcher. Once your games are set up, launch them directly from Steam's Game Mode. Open DeckOps whenever you want to update a client, reinstall after a Steam update, add a new game, or re-apply controller templates.
-
-For CoD4 and World at War, DeckOps creates separate non-Steam shortcuts for multiplayer modes with their own artwork and controller profiles. The original Steam games default to singleplayer.
+**Launch Steam in Desktop Mode before switching to Game Mode.** This lets Steam reload the config changes DeckOps made. Then switch to Game Mode and play normally.
 
 ---
 
 ## 🎮 Supported Games
-
-DeckOps installs four controller templates into Steam during setup - two gyro layouts (Hold or Toggle) and two additional layouts for games that need them. Steam Input is enabled automatically for every supported game. You can re-apply templates anytime from **DeckOps → Settings**.
 
 | Game | Client | Deck Model | Modes | Controller | Aim Assist | Gyro |
 |---|---|---|---|---|---|---|
@@ -69,9 +65,23 @@ DeckOps installs four controller templates into Steam during setup - two gyro la
 
 > Gyro is implemented via Steam Input and works on all titles regardless of native client support.
 
-### 📟 Steam Deck LCD - Plutonium Offline Play
+> **Steam Deck LCD:** Plutonium servers require OLED. For offline Campaign and Zombies on LCD, see [PlutoniumAltLauncher](https://github.com/framilano/PlutoniumAltLauncher).
 
-Plutonium's dedicated servers are only available on Steam Deck OLED. LCD users wanting Plutonium's improved campaigns or offline Zombies should check out **[PlutoniumAltLauncher](https://github.com/framilano/PlutoniumAltLauncher)** by framilano.
+---
+
+## 🔧 Troubleshooting
+
+**Shortcuts not using GE-Proton?**
+Go to **Settings → Repair Shortcuts** to re-apply GE-Proton and controller configs.
+
+**Controller profiles not working?**
+Go to **Settings → Re-apply Templates** to reinstall controller profiles.
+
+**Game asks for Safe Mode or override config?**
+Choose **No** — DeckOps has already configured optimal settings.
+
+**Cloud save out of sync?**
+Choose **Keep Local** to preserve DeckOps settings.
 
 ---
 
@@ -79,23 +89,19 @@ Plutonium's dedicated servers are only available on Steam Deck OLED. LCD users w
 
 DeckOps is an installer. The projects below are what actually make it work.
 
-**[PlutoniumAltLauncher](https://github.com/framilano/PlutoniumAltLauncher)** - framilano's project was the original inspiration for DeckOps.
+**[PlutoniumAltLauncher](https://github.com/framilano/PlutoniumAltLauncher)** - Original inspiration for DeckOps.
 
-**[Plutonium](https://plutonium.pw)** - MW3, World at War, Black Ops, Black Ops II. Community client with dedicated servers, mod support, and anti-cheat. 💰 [Donate](https://forum.plutonium.pw/donate)
+**[Plutonium](https://plutonium.pw)** - MW3, World at War, Black Ops, Black Ops II. 💰 [Donate](https://forum.plutonium.pw/donate)
 
-**[iw4x](https://iw4x.io)** - Modern Warfare 2. Community client with dedicated servers and mod support. [GitHub](https://github.com/iw4x)
+**[iw4x](https://iw4x.io)** - Modern Warfare 2. [GitHub](https://github.com/iw4x)
 
-**[CoD4x](https://cod4x.ovh)** - Call of Duty 4. Community client with dedicated servers and mod support. [GitHub](https://github.com/callofduty4x)
+**[CoD4x](https://cod4x.ovh)** - Call of Duty 4. [GitHub](https://github.com/callofduty4x)
 
-**[IW3SP-MOD](https://gitea.com/JerryALT/iw3sp_mod)** - Call of Duty 4 Campaign. Mod by JerryALT bringing gamepad support, aim assist, achievements, and Workshop mod support. [Gitea](https://gitea.com/JerryALT/iw3sp_mod)
+**[IW3SP-MOD](https://gitea.com/JerryALT/iw3sp_mod)** - CoD4 Campaign mod by JerryALT.
 
-Steam library artwork sourced from [SteamGridDB](https://www.steamgriddb.com) - thanks to Moohoo, jarvis, Ramjez, Over, Uravity-PRO, and Maxine.
+Steam artwork from [SteamGridDB](https://www.steamgriddb.com) — thanks to Moohoo, jarvis, Ramjez, Over, Uravity-PRO, and Maxine.
 
-**[Claude](https://claude.ai)** by Anthropic - assisted in the development of DeckOps.
-
----
-
-DeckOps takes no money and has no affiliation with any of the above projects. All client software is downloaded directly from each project's official sources at install time.
+**[Claude](https://claude.ai)** by Anthropic — assisted in development.
 
 ---
 
@@ -103,4 +109,4 @@ DeckOps takes no money and has no affiliation with any of the above projects. Al
 
 [MIT License](LICENSE)
 
-DeckOps is not affiliated with Activision, Infinity Ward, Treyarch, or Valve. All trademarks belong to their respective owners. Use of community clients may violate the terms of service of the original games. Use at your own discretion.
+DeckOps is not affiliated with Activision, Infinity Ward, Treyarch, or Valve. All trademarks belong to their respective owners.
