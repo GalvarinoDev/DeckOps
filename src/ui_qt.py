@@ -96,6 +96,16 @@ KEY_EXES = {
     "t6zm":"t6zm.exe","t6mp":"t6mp.exe",
 }
 
+def _is_prefix_ready(steam_root: str, appid: int) -> bool:
+    """
+    Check if a game has been launched through Steam at least once.
+    Returns True if the Proton prefix exists and is initialized.
+    """
+    prefix = os.path.join(
+        steam_root, "steamapps", "compatdata", str(appid), "pfx"
+    )
+    return os.path.isdir(prefix)
+
 SP_IMAGE_URLS = {
     7940:   "https://shared.steamstatic.com/store_item_assets/steam/apps/7940/header.jpg",
     10190:  "https://shared.steamstatic.com/store_item_assets/steam/apps/10180/header.jpg",
@@ -386,8 +396,7 @@ class SetupScreen(QWidget):
         t.setStyleSheet("color:#FFF;background:transparent;"); lay.addWidget(t)
         lay.addWidget(_lbl(
             "Choose which games to set up. "
-            "DeckOps will download and install "
-            "the community client for each selected game.", 13, C_DIM))
+            "Games marked with ⚠ must be launched through Steam first.", 13, C_DIM))
         scroll = QScrollArea(); scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._lw = QWidget(); self._ll = QVBoxLayout(self._lw)
@@ -419,16 +428,39 @@ class SetupScreen(QWidget):
             if not ik: continue
             base = gd["base"]; done = any(cfg.is_game_setup(k) for k in ik)
             color = C_IW if gd["dev"]=="iw" else C_TREY
+            
+            # Check if prefix exists (game has been launched through Steam)
+            prefix_ready = _is_prefix_ready(self.steam_root, gd["appid"])
+            
             row = QHBoxLayout(); row.setSpacing(16); row.setContentsMargins(8,8,8,8)
-            cb = QCheckBox(); cb.setChecked(not done); self._checks[base] = (cb, gd)
-            name = _lbl(base, 15, "#666677" if done else "#FFF", align=Qt.AlignLeft, wrap=False)
+            cb = QCheckBox()
+            
+            if not prefix_ready:
+                # Prefix missing — disable checkbox, show warning
+                cb.setChecked(False)
+                cb.setEnabled(False)
+                name = _lbl(base, 15, "#555566", align=Qt.AlignLeft, wrap=False)
+            elif done:
+                cb.setChecked(False)
+                name = _lbl(base, 15, "#666677", align=Qt.AlignLeft, wrap=False)
+            else:
+                cb.setChecked(True)
+                name = _lbl(base, 15, "#FFF", align=Qt.AlignLeft, wrap=False)
+            
+            self._checks[base] = (cb, gd)
             badge = QPushButton(gd["client"].upper()); badge.setFont(font(10,True))
             badge.setFixedSize(160,30); badge.setEnabled(False)
             badge.setStyleSheet(f"QPushButton{{background:{color};color:#FFF;border:none;border-radius:6px;}}QPushButton:disabled{{background:{color};color:#FFF;}}")
             row.addWidget(cb); row.addWidget(name, stretch=1); row.addWidget(badge)
-            if done:
+            
+            if not prefix_ready:
+                # Show launch warning
+                warn = _lbl("⚠ Launch through Steam first", 11, C_TREY, align=Qt.AlignRight, wrap=False)
+                warn.setFixedWidth(180); row.addWidget(warn)
+            elif done:
                 tick = _lbl("✓ set up", 12, C_IW, align=Qt.AlignRight, wrap=False)
                 tick.setFixedWidth(80); row.addWidget(tick)
+            
             cw = QWidget(); cw.setLayout(row)
             self._ll.insertWidget(self._ll.count()-1, cw)
 
@@ -1118,6 +1150,17 @@ class ConfigureScreen(QWidget):
         lay.addLayout(cr)
         lay.addWidget(_hdiv())
 
+        lay.addWidget(_lbl("Shortcuts & Proton", 14, "#CCC", align=Qt.AlignLeft))
+        lay.addWidget(_lbl(
+            "Repair non-Steam shortcuts (CoD4 MP, WaW MP) — re-applies GE-Proton, artwork, and controller configs.",
+            11, C_DIM, align=Qt.AlignLeft))
+        sr = QHBoxLayout(); sr.setSpacing(12)
+        shortcut_btn = _btn("Repair Shortcuts", C_DARK_BTN, size=12, h=40)
+        shortcut_btn.clicked.connect(self._repair_shortcuts)
+        sr.addWidget(shortcut_btn); sr.addStretch()
+        lay.addLayout(sr)
+        lay.addWidget(_hdiv())
+
         lay.addWidget(_lbl("Danger Zone", 14, C_TREY, align=Qt.AlignLeft))
         dr = QHBoxLayout(); dr.setSpacing(12)
         uninstall_btn = _btn("Full Uninstall", C_RED_BTN, size=12, h=40)
@@ -1223,6 +1266,51 @@ class ConfigureScreen(QWidget):
         cfg.reset()
         self.status.setText("Config wiped. Restart DeckOps to run setup again.")
         QTimer.singleShot(1500, lambda: self.stack.setCurrentIndex(0))
+
+    def _repair_shortcuts(self):
+        self.status.setText("Repairing shortcuts...")
+        s = _Sigs()
+        s.log.connect(lambda msg: self.status.setText(msg))
+        s.done.connect(lambda ok: self.status.setText(
+            "✓  Shortcuts repaired." if ok else "✗  Failed — check that Steam is closed."
+        ))
+        def _run():
+            try:
+                from shortcut import create_shortcuts, SHORTCUTS
+                from wrapper import set_steam_input_enabled
+                
+                # Find installed games
+                steam_root = cfg.load().get("steam_root", "") or find_steam_root()
+                if not steam_root:
+                    s.log.emit("✗  Steam not found.")
+                    s.done.emit(False)
+                    return
+                
+                libs = parse_library_folders(steam_root)
+                installed = find_installed_games(libs)
+                
+                # Get keys for shortcuts that are installed
+                shortcut_keys = [k for k in SHORTCUTS.keys() if k in installed]
+                if not shortcut_keys:
+                    s.log.emit("No shortcut-eligible games found.")
+                    s.done.emit(True)
+                    return
+                
+                gyro_mode = cfg.get_gyro_mode() or "hold"
+                create_shortcuts(
+                    installed_games=installed,
+                    selected_keys=shortcut_keys,
+                    gyro_mode=gyro_mode,
+                    on_progress=lambda msg: s.log.emit(msg)
+                )
+                
+                # Also re-enable Steam Input
+                set_steam_input_enabled(steam_root)
+                s.done.emit(True)
+            except Exception as ex:
+                s.log.emit(f"✗  Failed: {ex}")
+                s.done.emit(False)
+        threading.Thread(target=_run, daemon=True).start()
 
 
 # ── UpdateScreen ───────────────────────────────────────────────────────────────
