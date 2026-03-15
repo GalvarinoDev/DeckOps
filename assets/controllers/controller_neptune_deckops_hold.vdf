@@ -288,8 +288,12 @@
 					{
 						"bindings"
 						{
+							"binding"		"xinput_button X, , "
 						}
 					}
+				}
+				"disabled_activators"
+				{
 				}
 			}
 			"button_back_right"
@@ -303,6 +307,9 @@
 						}
 					}
 				}
+				"disabled_activators"
+				{
+				}
 			}
 			"button_back_left_upper"
 			{
@@ -312,8 +319,12 @@
 					{
 						"bindings"
 						{
+							"binding"		"xinput_button A, , "
 						}
 					}
+				}
+				"disabled_activators"
+				{
 				}
 			}
 			"button_back_right_upper"
@@ -324,8 +335,12 @@
 					{
 						"bindings"
 						{
+							"binding"		"xinput_button B, , "
 						}
 					}
+				}
+				"disabled_activators"
+				{
 				}
 			}
 		}
