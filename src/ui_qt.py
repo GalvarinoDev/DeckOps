@@ -546,6 +546,26 @@ class InstallScreen(QWidget):
                 except Exception as ex:
                     self._s.log.emit(f"  Controller profile assignment skipped: {ex}")
 
+        _launch_defaults_set = False
+        def _set_launch_defaults():
+            nonlocal _launch_defaults_set
+            if _launch_defaults_set:
+                return
+            defaults = {}
+            if has_cod4:
+                defaults["7940"] = ("7a722f97", "1")   # CoD4 → Singleplayer
+            if any(k in ("t4sp", "t4mp") for k in selected_keys):
+                defaults["10090"] = ("9aa5e05f", "0") # WaW → Campaign
+            if not defaults:
+                return
+            try:
+                from wrapper import set_default_launch_option
+                set_default_launch_option(self.steam_root, defaults)
+                self._s.log.emit("✓  Default launch options set (SP mode)")
+                _launch_defaults_set = True
+            except Exception as ex:
+                self._s.log.emit(f"  Launch options skipped: {ex}")
+
         # ── GE-Proton download + extract (Steam still running — no config.vdf write yet) ──
         try:
             self._s.progress.emit(2, "Installing GE-Proton...")
@@ -649,6 +669,7 @@ class InstallScreen(QWidget):
                 self._s.log.emit(f"  Could not close Steam: {ex}")
             _apply_compat()
             _assign_profiles()
+            _set_launch_defaults()
 
             plut_selected = [(k, gd, g) for k, gd, g in self.selected if KEY_CLIENT.get(k) == "plutonium"]
             total_plut = len(plut_selected)
@@ -680,6 +701,7 @@ class InstallScreen(QWidget):
                     self._s.log.emit(f"  Could not close Steam: {ex}")
                 _apply_compat()
                 _assign_profiles()
+                _set_launch_defaults()
 
             cod4_selected = [(k, gd, g) for k, gd, g in self.selected if KEY_CLIENT.get(k) in ("cod4x", "iw3sp")]
             for key, gd, game in cod4_selected:
@@ -736,6 +758,21 @@ class InstallScreen(QWidget):
                 self._s.log.emit(f"  Could not close Steam: {ex}")
             _apply_compat()
             _assign_profiles()
+            _set_launch_defaults()
+
+        # ── Non-Steam shortcuts for MP modes ──────────────────────────────────
+        try:
+            from shortcut import create_shortcuts
+            self._s.log.emit("Creating non-Steam shortcuts...")
+            installed_for_shortcuts = {k: g for k, gd, g in self.selected if g}
+            create_shortcuts(
+                installed_games=installed_for_shortcuts,
+                selected_keys=selected_keys,
+                gyro_mode=cfg.get_gyro_mode() or "hold",
+                on_progress=lambda msg: self._s.log.emit(msg)
+            )
+        except Exception as ex:
+            self._s.log.emit(f"  Shortcuts skipped: {ex}")
 
         cfg.complete_first_run(self.steam_root)
         self._s.progress.emit(100, "All done!")
@@ -964,84 +1001,67 @@ class ManagementScreen(QWidget):
 class ControllerInfoScreen(QWidget):
     def __init__(self, stack):
         super().__init__(); self.stack = stack
-        lay = QVBoxLayout(self); lay.setContentsMargins(60,40,60,40); lay.setSpacing(16)
+        lay = QVBoxLayout(self); lay.setContentsMargins(60,40,60,40); lay.setSpacing(14)
 
-        t = QLabel("CONTROLLER SETUP"); t.setFont(font(32, True)); t.setAlignment(Qt.AlignCenter)
+        t = QLabel("SETUP COMPLETE"); t.setFont(font(32, True)); t.setAlignment(Qt.AlignCenter)
         t.setStyleSheet("color:#FFF;background:transparent;"); lay.addWidget(t)
         lay.addWidget(_lbl(
-            "DeckOps has automatically assigned controller profiles for each game. "
-            "You're good to go — no manual setup needed.",
+            "DeckOps has configured your games with controller profiles, GE-Proton, "
+            "and display settings. You're ready to play.",
             13, C_DIM))
         lay.addWidget(_hdiv())
 
-        cols = QHBoxLayout(); cols.setSpacing(24)
-
-        def _column(title, color, games):
-            col = QVBoxLayout(); col.setSpacing(8)
-            col.addWidget(_lbl(title, 12, color, bold=True, align=Qt.AlignLeft))
-            col.addWidget(_hdiv())
-            for game in games:
-                row = QHBoxLayout(); row.setContentsMargins(8,0,0,0); row.setSpacing(8)
-                dot = _lbl("•", 13, color, wrap=False); dot.setFixedWidth(14)
-                name = _lbl(game, 12, "#DDD", align=Qt.AlignLeft)
-                row.addWidget(dot); row.addWidget(name, stretch=1)
-                w = QWidget(); w.setLayout(row)
-                col.addWidget(w)
-            col.addStretch()
-            return col
-
-        gyro_col = _column(
-            "Standard layout assigned",
-            C_IW,
-            [
-                "Modern Warfare 1  —  Multiplayer",
-                "Modern Warfare 2  —  Multiplayer",
-                "Modern Warfare 3  —  Multiplayer",
-                "World at War  —  All modes",
-                "Black Ops  —  All modes",
-                "Black Ops II  —  All modes",
-            ]
+        # ── Warning box ────────────────────────────────────────────────────────
+        warn_frame = QFrame()
+        warn_frame.setStyleSheet(
+            f"QFrame{{background:#1A1A10;border:2px solid {C_TREY};border-radius:8px;}}"
         )
+        wl = QVBoxLayout(warn_frame); wl.setContentsMargins(16,12,16,12); wl.setSpacing(8)
+        wl.addWidget(_lbl("⚠  IMPORTANT", 13, C_TREY, bold=True, align=Qt.AlignLeft))
+        wl.addWidget(_lbl(
+            "On first launch, if Steam says your cloud save is out of sync, choose Keep Local.\n"
+            "If any Call of Duty game asks to start in Safe Mode or override your configuration, choose No.",
+            12, "#CCC", align=Qt.AlignLeft))
+        lay.addWidget(warn_frame)
+        lay.addSpacing(4)
 
-        other_col = _column(
-            "KB+M layout assigned",
-            C_TREY,
-            [
-                "Modern Warfare 2  —  Singleplayer",
-                "Modern Warfare 3  —  Singleplayer",
-            ]
-        )
+        # ── Controller profiles section ────────────────────────────────────────
+        lay.addWidget(_lbl("✓  Controller Profiles", 13, C_IW, bold=True, align=Qt.AlignLeft))
 
-        cod4_col = _column(
-            "Both layouts assigned",
-            C_DIM,
-            [
-                "Modern Warfare 1  —  Singleplayer + Multiplayer",
-            ]
-        )
-
-        cols.addLayout(gyro_col, stretch=3)
-        div1 = QFrame(); div1.setFrameShape(QFrame.VLine)
-        div1.setStyleSheet("color:#252530;"); cols.addWidget(div1)
-        cols.addLayout(other_col, stretch=2)
-        div2 = QFrame(); div2.setFrameShape(QFrame.VLine)
-        div2.setStyleSheet("color:#252530;"); cols.addWidget(div2)
-        cols.addLayout(cod4_col, stretch=2)
-        lay.addLayout(cols, stretch=1)
-
-        lay.addWidget(_hdiv())
+        gyro_mode = cfg.get_gyro_mode() or "hold"
+        gyro_desc = "R5 held" if gyro_mode == "hold" else "R5 toggles"
         lay.addWidget(_lbl(
-            "You can switch between profiles at any time in Steam  →  Controller Settings  →  Default Layouts.\n"
-            "To change Hold ↔ Toggle, go to Settings  →  Re-apply Templates.",
-            12, C_DIM))
-
-        lay.addWidget(_hdiv())
-        lay.addWidget(_lbl("✓  GE-Proton", 13, C_IW, bold=True, align=Qt.AlignLeft))
-        ge_ver = cfg.get_ge_proton_version() or "GE-Proton (version unknown)"
-        lay.addWidget(_lbl(
-            f"GE-Proton has been set automatically for all games.\n"
-            f"Installed version: {ge_ver}",
+            f"Standard gamepad layout with gyro aiming ({gyro_desc}) assigned to all games.",
             12, C_DIM, align=Qt.AlignLeft))
+
+        # Exceptions note
+        exceptions_frame = QFrame()
+        exceptions_frame.setStyleSheet(f"QFrame{{background:{C_CARD};border-radius:6px;}}")
+        el = QVBoxLayout(exceptions_frame); el.setContentsMargins(12,10,12,10); el.setSpacing(6)
+        el.addWidget(_lbl("Exceptions — these use the Other template (keyboard-based layout):", 11, "#AAA", align=Qt.AlignLeft))
+        for game in ["MW1 Multiplayer (CoD4x)", "MW2 Singleplayer", "MW3 Singleplayer"]:
+            row = QHBoxLayout(); row.setContentsMargins(8,0,0,0); row.setSpacing(8)
+            dot = _lbl("•", 11, C_DIM, wrap=False); dot.setFixedWidth(12)
+            name = _lbl(game, 11, "#888", align=Qt.AlignLeft)
+            row.addWidget(dot); row.addWidget(name, stretch=1)
+            w = QWidget(); w.setLayout(row)
+            el.addWidget(w)
+        lay.addWidget(exceptions_frame)
+
+        lay.addWidget(_lbl(
+            "Switch profiles anytime: Steam → Controller Settings → Default Layouts.\n"
+            "Change Hold ↔ Toggle in Settings → Re-apply Controller Profiles.",
+            11, "#666", align=Qt.AlignLeft))
+
+        lay.addWidget(_hdiv())
+
+        # ── GE-Proton section ──────────────────────────────────────────────────
+        lay.addWidget(_lbl("✓  GE-Proton", 13, C_IW, bold=True, align=Qt.AlignLeft))
+        lay.addWidget(_lbl(
+            "Newest GE-Proton installed and set for all games.",
+            12, C_DIM, align=Qt.AlignLeft))
+
+        lay.addStretch()
 
         cont = _btn("Continue to My Games  >>", C_IW, h=52)
         cont.clicked.connect(self._go_management)

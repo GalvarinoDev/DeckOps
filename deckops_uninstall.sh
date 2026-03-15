@@ -416,21 +416,83 @@ echo ""
 info "Removing non-Steam shortcut artwork from Steam grid..."
 
 python3 - << 'PYEOF'
-import os, re
+import os, re, binascii, glob
 
-APPIDS = ["3486055414", "3884157948"]
-steam_dir = os.path.expanduser("~/.local/share/Steam")
-userdata  = os.path.join(steam_dir, "userdata")
+# Shortcut definitions — must match shortcut.py
+SHORTCUTS = {
+    "cod4mp": {
+        "name":       "Call of Duty 4: Modern Warfare - Multiplayer",
+        "exe_name":   "iw3mp.exe",
+        "game_appid": "7940",
+    },
+    "t4mp": {
+        "name":       "Call of Duty: World at War - Multiplayer",
+        "exe_name":   "CoDWaWmp.exe",
+        "game_appid": "10090",
+    },
+}
+
+def find_install_dir(steam_root, appid):
+    """Find the install directory for a Steam appid."""
+    search_dirs = [os.path.join(steam_root, "steamapps")]
+    
+    # Parse libraryfolders.vdf
+    vdf_path = os.path.join(steam_root, "steamapps", "libraryfolders.vdf")
+    if os.path.exists(vdf_path):
+        with open(vdf_path, "r", errors="replace") as f:
+            for match in re.findall(r'"path"\s+"([^"]+)"', f.read()):
+                search_dirs.append(os.path.join(match, "steamapps"))
+                search_dirs.append(os.path.join(match, "SteamLibrary", "steamapps"))
+    
+    # SD card paths
+    for pattern in ["/run/media/deck/*/SteamLibrary/steamapps", "/run/media/deck/*/steamapps"]:
+        search_dirs.extend(glob.glob(pattern))
+    
+    for steamapps in search_dirs:
+        acf = os.path.join(steamapps, f"appmanifest_{appid}.acf")
+        if os.path.exists(acf):
+            with open(acf, "r", errors="replace") as f:
+                match = re.search(r'"installdir"\s+"([^"]+)"', f.read())
+                if match:
+                    return os.path.join(steamapps, "common", match.group(1))
+    return None
+
+def calc_shortcut_appid(exe_path, name):
+    """Calculate Steam's shortcut appid from exe path and name."""
+    key = (exe_path + name).encode("utf-8")
+    crc = binascii.crc32(key) & 0xFFFFFFFF
+    return str((crc | 0x80000000) & 0xFFFFFFFF)
+
+steam_root = os.path.expanduser("~/.local/share/Steam")
+userdata   = os.path.join(steam_root, "userdata")
 
 if not os.path.isdir(userdata):
+    print("  No Steam userdata found — skipping.")
     exit(0)
 
+# Calculate actual shortcut appids based on installed game paths
+shortcut_appids = set()
+for key, info in SHORTCUTS.items():
+    install_dir = find_install_dir(steam_root, info["game_appid"])
+    if install_dir:
+        exe_path = os.path.join(install_dir, info["exe_name"])
+        appid = calc_shortcut_appid(exe_path, info["name"])
+        shortcut_appids.add(appid)
+        print(f"  Found {info['name']} → appid {appid}")
+
+if not shortcut_appids:
+    print("  No shortcut appids to clean up.")
+    exit(0)
+
+# Remove artwork files matching these appids
 for uid in os.listdir(userdata):
+    if not uid.isdigit() or int(uid) < 10000:
+        continue
     grid_dir = os.path.join(userdata, uid, "config", "grid")
     if not os.path.isdir(grid_dir):
         continue
     for f in os.listdir(grid_dir):
-        for appid in APPIDS:
+        for appid in shortcut_appids:
             if f.startswith(appid):
                 path = os.path.join(grid_dir, f)
                 os.remove(path)
@@ -460,32 +522,113 @@ echo ""
 info "Removing per-game controller configs..."
 
 python3 - << 'PYEOF'
-import os, shutil
+import os, shutil, re, binascii, glob
 
 STEAM_DIR = os.path.expanduser("~/.local/share/Steam")
 USERDATA  = os.path.join(STEAM_DIR, "userdata")
 
-MANAGED_APPIDS = [
+# Standard Steam appids managed by DeckOps
+MANAGED_STEAM_APPIDS = [
     "7940", "10090", "10180", "10190", "42680", "42690",
     "42700", "42710", "202970", "202990", "212910",
 ]
+
+# Shortcut definitions — must match shortcut.py
+SHORTCUTS = {
+    "cod4mp": {
+        "name":       "Call of Duty 4: Modern Warfare - Multiplayer",
+        "exe_name":   "iw3mp.exe",
+        "game_appid": "7940",
+    },
+    "t4mp": {
+        "name":       "Call of Duty: World at War - Multiplayer",
+        "exe_name":   "CoDWaWmp.exe",
+        "game_appid": "10090",
+    },
+}
+
+def find_install_dir(steam_root, appid):
+    """Find the install directory for a Steam appid."""
+    search_dirs = [os.path.join(steam_root, "steamapps")]
+    
+    vdf_path = os.path.join(steam_root, "steamapps", "libraryfolders.vdf")
+    if os.path.exists(vdf_path):
+        with open(vdf_path, "r", errors="replace") as f:
+            for match in re.findall(r'"path"\s+"([^"]+)"', f.read()):
+                search_dirs.append(os.path.join(match, "steamapps"))
+                search_dirs.append(os.path.join(match, "SteamLibrary", "steamapps"))
+    
+    for pattern in ["/run/media/deck/*/SteamLibrary/steamapps", "/run/media/deck/*/steamapps"]:
+        search_dirs.extend(glob.glob(pattern))
+    
+    for steamapps in search_dirs:
+        acf = os.path.join(steamapps, f"appmanifest_{appid}.acf")
+        if os.path.exists(acf):
+            with open(acf, "r", errors="replace") as f:
+                match = re.search(r'"installdir"\s+"([^"]+)"', f.read())
+                if match:
+                    return os.path.join(steamapps, "common", match.group(1))
+    return None
+
+def calc_shortcut_appid(exe_path, name):
+    """Calculate Steam's shortcut appid from exe path and name."""
+    key = (exe_path + name).encode("utf-8")
+    crc = binascii.crc32(key) & 0xFFFFFFFF
+    return str((crc | 0x80000000) & 0xFFFFFFFF)
 
 if not os.path.isdir(USERDATA):
     print("  No Steam userdata found — skipping.")
     exit(0)
 
+# Build list of all appids to remove: Steam appids + dynamic shortcut appids
+all_appids = set(MANAGED_STEAM_APPIDS)
+
+for key, info in SHORTCUTS.items():
+    install_dir = find_install_dir(STEAM_DIR, info["game_appid"])
+    if install_dir:
+        exe_path = os.path.join(install_dir, info["exe_name"])
+        appid = calc_shortcut_appid(exe_path, info["name"])
+        all_appids.add(appid)
+
 for uid in os.listdir(USERDATA):
     if not uid.isdigit() or int(uid) < 10000:
         continue
-    # Correct path: userdata/<uid>/241100/remote/controller_config/<appid>/
+    
+    # Path 1: userdata/<uid>/241100/remote/controller_config/<appid>/
     configs_root = os.path.join(USERDATA, uid, "241100", "remote", "controller_config")
-    if not os.path.isdir(configs_root):
-        continue
-    for appid in MANAGED_APPIDS:
-        appid_dir = os.path.join(configs_root, appid)
-        if os.path.isdir(appid_dir):
-            shutil.rmtree(appid_dir)
-            print(f"  uid {uid}: removed controller config for appid {appid}")
+    if os.path.isdir(configs_root):
+        for appid in all_appids:
+            appid_dir = os.path.join(configs_root, appid)
+            if os.path.isdir(appid_dir):
+                shutil.rmtree(appid_dir)
+                print(f"  uid {uid}: removed controller_config for appid {appid}")
+    
+    # Path 2: Steam Controller Configs/<uid>/config/<appid>/ (used by shortcut.py)
+    steam_cfg_root = os.path.join(
+        STEAM_DIR, "steamapps", "common",
+        "Steam Controller Configs", uid, "config"
+    )
+    if os.path.isdir(steam_cfg_root):
+        for appid in all_appids:
+            appid_dir = os.path.join(steam_cfg_root, appid)
+            if os.path.isdir(appid_dir):
+                shutil.rmtree(appid_dir)
+                print(f"  uid {uid}: removed Steam Controller Config for appid {appid}")
+        
+        # Also clean configset files
+        for configset in ["configset_controller_neptune.vdf"]:
+            configset_path = os.path.join(steam_cfg_root, configset)
+            if os.path.exists(configset_path):
+                with open(configset_path, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read()
+                original = content
+                for appid in all_appids:
+                    pattern = rf'\t"{re.escape(appid)}"\n\t\{{[^\}}]*\}}\n?'
+                    content = re.sub(pattern, "", content, flags=re.MULTILINE)
+                if content != original:
+                    with open(configset_path, "w", encoding="utf-8") as f:
+                        f.write(content)
+                    print(f"  uid {uid}: cleaned {configset}")
 PYEOF
 
 success "Per-game controller configs removed."
@@ -494,25 +637,79 @@ echo ""
 info "Removing DeckOps CompatToolMapping entries from Steam config..."
 
 python3 - << 'PYEOF'
-import os, re
+import os, re, binascii, glob
 
-STEAM_CONFIG = os.path.expanduser("~/.local/share/Steam/config/config.vdf")
+# Shortcut definitions — must match shortcut.py
+SHORTCUTS = {
+    "cod4mp": {
+        "name":       "Call of Duty 4: Modern Warfare - Multiplayer",
+        "exe_name":   "iw3mp.exe",
+        "game_appid": "7940",
+    },
+    "t4mp": {
+        "name":       "Call of Duty: World at War - Multiplayer",
+        "exe_name":   "CoDWaWmp.exe",
+        "game_appid": "10090",
+    },
+}
 
-MANAGED_APPIDS = [
+# Standard Steam appids managed by DeckOps
+MANAGED_STEAM_APPIDS = [
     "7940", "10090", "10180", "10190", "42680", "42690",
     "42700", "42710", "202970", "202990", "212910",
-    "3486055414", "3884157948",
 ]
+
+def find_install_dir(steam_root, appid):
+    """Find the install directory for a Steam appid."""
+    search_dirs = [os.path.join(steam_root, "steamapps")]
+    
+    vdf_path = os.path.join(steam_root, "steamapps", "libraryfolders.vdf")
+    if os.path.exists(vdf_path):
+        with open(vdf_path, "r", errors="replace") as f:
+            for match in re.findall(r'"path"\s+"([^"]+)"', f.read()):
+                search_dirs.append(os.path.join(match, "steamapps"))
+                search_dirs.append(os.path.join(match, "SteamLibrary", "steamapps"))
+    
+    for pattern in ["/run/media/deck/*/SteamLibrary/steamapps", "/run/media/deck/*/steamapps"]:
+        search_dirs.extend(glob.glob(pattern))
+    
+    for steamapps in search_dirs:
+        acf = os.path.join(steamapps, f"appmanifest_{appid}.acf")
+        if os.path.exists(acf):
+            with open(acf, "r", errors="replace") as f:
+                match = re.search(r'"installdir"\s+"([^"]+)"', f.read())
+                if match:
+                    return os.path.join(steamapps, "common", match.group(1))
+    return None
+
+def calc_shortcut_appid(exe_path, name):
+    """Calculate Steam's shortcut appid from exe path and name."""
+    key = (exe_path + name).encode("utf-8")
+    crc = binascii.crc32(key) & 0xFFFFFFFF
+    return str((crc | 0x80000000) & 0xFFFFFFFF)
+
+STEAM_CONFIG = os.path.expanduser("~/.local/share/Steam/config/config.vdf")
+steam_root   = os.path.expanduser("~/.local/share/Steam")
 
 if not os.path.exists(STEAM_CONFIG):
     print("  Steam config.vdf not found — skipping.")
     exit(0)
 
+# Build list of all appids to remove: Steam appids + dynamic shortcut appids
+all_appids = set(MANAGED_STEAM_APPIDS)
+
+for key, info in SHORTCUTS.items():
+    install_dir = find_install_dir(steam_root, info["game_appid"])
+    if install_dir:
+        exe_path = os.path.join(install_dir, info["exe_name"])
+        appid = calc_shortcut_appid(exe_path, info["name"])
+        all_appids.add(appid)
+
 with open(STEAM_CONFIG, "r", encoding="utf-8") as f:
     data = f.read()
 
 original = data
-for appid in MANAGED_APPIDS:
+for appid in all_appids:
     pattern = rf'\t+"{re.escape(appid)}"\n\t+\{{[^}}]*\}}\n?'
     data = re.sub(pattern, "", data, flags=re.MULTILINE)
 

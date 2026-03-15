@@ -295,3 +295,69 @@ def set_steam_input_enabled(steam_root, appids=None):
         if modified:
             with open(vdf_path, "w", errors="replace") as f:
                 f.write(content)
+
+
+def set_default_launch_option(steam_root, appids_config):
+    """
+    Set the default launch option for games with multiple launch modes,
+    so Steam skips the 'which mode?' dialog.
+
+    appids_config — dict mapping appid to (hash_key, index)
+        e.g. {"7940": ("7a722f97", "1"), "10090": ("9aa5e05f", "0")}
+
+    Must be called while Steam is closed.
+    """
+    userdata = os.path.join(steam_root, "userdata")
+    if not os.path.exists(userdata):
+        return
+
+    for uid in os.listdir(userdata):
+        vdf_path = os.path.join(userdata, uid, "config", "localconfig.vdf")
+        if not os.path.exists(vdf_path):
+            continue
+
+        with open(vdf_path, "r", errors="replace") as f:
+            content = f.read()
+
+        modified = False
+
+        for appid, (hash_key, index) in appids_config.items():
+            # Build the DefaultLaunchOption block
+            entry = (
+                f'\t\t\t\t\t"DefaultLaunchOption"\n'
+                f'\t\t\t\t\t{{\n'
+                f'\t\t\t\t\t\t"{hash_key}"\t\t"{index}"\n'
+                f'\t\t\t\t\t}}\n'
+            )
+
+            # Check if appid block exists
+            app_pattern = re.compile(
+                r'("' + re.escape(appid) + r'"\s*\{)(.*?)(\})',
+                re.IGNORECASE | re.DOTALL
+            )
+            match = app_pattern.search(content)
+
+            if match:
+                app_block = match.group(2)
+                dlo_pattern = re.compile(
+                    r'"DefaultLaunchOption"\s*\{[^}]*\}',
+                    re.IGNORECASE | re.DOTALL
+                )
+
+                if dlo_pattern.search(app_block):
+                    # Replace existing DefaultLaunchOption
+                    new_block = dlo_pattern.sub(entry.strip(), app_block)
+                else:
+                    # Insert DefaultLaunchOption into existing app block
+                    new_block = app_block.rstrip() + '\n' + entry + '\t\t\t\t'
+
+                content = (
+                    content[:match.start(2)] +
+                    new_block +
+                    content[match.end(2):]
+                )
+                modified = True
+
+        if modified:
+            with open(vdf_path, "w", errors="replace") as f:
+                f.write(content)
