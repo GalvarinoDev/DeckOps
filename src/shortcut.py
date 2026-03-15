@@ -9,6 +9,7 @@ Shortcuts include:
   - Proper artwork (icon, grid, wide, hero, logo) from SteamGridDB
   - Correct compatdata prefix via launch options
   - Controller template assignment based on gyro mode
+  - GE-Proton compat tool assignment
   - Steam Input enabled (AllowDesktopConfig)
 
 Called at the end of InstallScreen._run() after client installation completes.
@@ -28,6 +29,7 @@ import urllib.request
 STEAM_ROOT     = os.path.expanduser("~/.local/share/Steam")
 USERDATA_DIR   = os.path.join(STEAM_ROOT, "userdata")
 COMPAT_ROOT    = os.path.join(STEAM_ROOT, "steamapps", "compatdata")
+STEAM_CONFIG   = os.path.join(STEAM_ROOT, "config", "config.vdf")
 
 _HERE          = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT   = os.path.dirname(_HERE)
@@ -352,6 +354,78 @@ def _patch_configset(configset_path: str, key: str, template_name: str):
         f.write(content)
 
 
+# ── GE-Proton compat tool assignment ──────────────────────────────────────────
+
+def _assign_compat_tool(appid: int, prog):
+    """
+    Set GE-Proton compat tool for a non-Steam shortcut.
+    Reads the installed GE-Proton version from DeckOps config and writes
+    a CompatToolMapping entry to Steam's config.vdf.
+    """
+    try:
+        import config as cfg
+        ge_version = cfg.get_ge_proton_version()
+        
+        if not ge_version:
+            prog(f"    ⚠ No GE-Proton version found — skipping compat tool")
+            return
+        
+        if not os.path.exists(STEAM_CONFIG):
+            prog(f"    ⚠ Steam config.vdf not found — skipping compat tool")
+            return
+        
+        appid_str = str(appid)
+        
+        with open(STEAM_CONFIG, "r", encoding="utf-8") as f:
+            data = f.read()
+        
+        entry = (
+            f'\t\t\t\t"{appid_str}"\n'
+            f'\t\t\t\t{{\n'
+            f'\t\t\t\t\t"name"\t\t"{ge_version}"\n'
+            f'\t\t\t\t\t"config"\t\t""\n'
+            f'\t\t\t\t\t"Priority"\t\t"250"\n'
+            f'\t\t\t\t}}\n'
+        )
+        
+        # If appid block already exists, replace it
+        pattern = rf'(\t+"{re.escape(appid_str)}"\n\t+\{{[^}}]*\}})'
+        if re.search(pattern, data, re.MULTILINE):
+            data = re.sub(pattern, entry.rstrip('\n'), data, flags=re.MULTILINE)
+        else:
+            # Insert after CompatToolMapping opening brace
+            data = re.sub(
+                r'("CompatToolMapping"\s*\{)',
+                r'\1\n' + entry,
+                data,
+                count=1
+            )
+        
+        # Create CompatToolMapping block if it doesn't exist at all
+        if '"CompatToolMapping"' not in data:
+            block = (
+                '\t\t\t"CompatToolMapping"\n'
+                '\t\t\t{\n'
+                + entry +
+                '\t\t\t}\n'
+            )
+            # Insert before closing of Software/Valve/Steam block
+            data = re.sub(
+                r'("Steam"\s*\{)',
+                r'\1\n' + block,
+                data,
+                count=1
+            )
+        
+        with open(STEAM_CONFIG, "w", encoding="utf-8") as f:
+            f.write(data)
+        
+        prog(f"    ✓ GE-Proton: {ge_version}")
+        
+    except Exception as ex:
+        prog(f"    ⚠ Compat tool failed: {ex}")
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def create_shortcuts(installed_games: dict, selected_keys: list,
@@ -384,6 +458,10 @@ def create_shortcuts(installed_games: dict, selected_keys: list,
     if not uids:
         prog("⚠ No Steam user accounts found — shortcuts skipped.")
         return
+    
+    # Track which shortcut appids we've already assigned compat tools for
+    # (only need to do this once per shortcut, not per user)
+    compat_assigned = set()
     
     for uid in uids:
         prog(f"Creating shortcuts for user {uid}...")
@@ -440,6 +518,11 @@ def create_shortcuts(installed_games: dict, selected_keys: list,
             
             _download_artwork(grid_dir, shortcut_appid, shortcut_def, prog)
             _assign_controller_config(uid, shortcut_appid, shortcut_def, gyro_mode, prog)
+            
+            # Assign GE-Proton compat tool (only once per shortcut, not per user)
+            if shortcut_appid not in compat_assigned:
+                _assign_compat_tool(shortcut_appid, prog)
+                compat_assigned.add(shortcut_appid)
         
         if new_entries:
             try:
