@@ -1051,7 +1051,6 @@ class ControllerInfoScreen(QWidget):
         wl = QVBoxLayout(warn_frame); wl.setContentsMargins(16,12,16,12); wl.setSpacing(8)
         wl.addWidget(_lbl("⚠  IMPORTANT", 13, C_TREY, bold=True, align=Qt.AlignLeft))
         wl.addWidget(_lbl(
-            "Launch Steam in Desktop Mode before switching to Game Mode.\n"
             "If Steam asks about cloud saves, choose Keep Local. If a game asks for Safe Mode, choose No.",
             12, "#CCC", align=Qt.AlignLeft))
         lay.addWidget(warn_frame)
@@ -1095,10 +1094,18 @@ class ControllerInfoScreen(QWidget):
 
         lay.addStretch()
 
-        cont = _btn("Continue to My Games  >>", C_IW, h=52)
-        cont.clicked.connect(self._go_management)
+        cont = _btn("Launch Steam & Continue  >>", C_IW, h=52)
+        cont.clicked.connect(self._launch_steam_and_continue)
         cw = QHBoxLayout(); cw.addStretch(); cw.addWidget(cont, stretch=1); cw.addStretch()
         lay.addLayout(cw)
+
+    def _launch_steam_and_continue(self):
+        # Launch Steam in background
+        try:
+            subprocess.Popen(["steam"], start_new_session=True)
+        except Exception:
+            pass  # Continue anyway if Steam fails to launch
+        self._go_management()
 
     def _go_management(self):
         root = find_steam_root()
