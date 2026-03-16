@@ -98,25 +98,13 @@ def install_iw3sp(game: dict, steam_root: str,
         zf.extractall(install_dir)
     os.remove(zip_dest)
 
-    # Set Steam launch option so appid 7940 runs iw3sp_mod.exe directly
-    prog(80, "Setting Steam launch option...")
-    try:
-        from wrapper import set_launch_options
-        set_launch_options(steam_root, "7940", "bash -c 'exec \"${@/iw3sp.exe/iw3sp_mod.exe}\"' -- %command%")
-        prog(90, "Launch option set.")
-    except Exception as ex:
-        prog(90, f"Warning: could not set launch option: {ex}")
-
     # Write metadata
-    prog(95, "Saving metadata...")
+    prog(80, "Saving metadata...")
     meta_path = os.path.join(install_dir, METADATA_FILE)
     with open(meta_path, "w") as f:
         json.dump({"version": "4.1.5"}, f, indent=2)
 
-    prog(100, "IW3SP-MOD installation complete!")
-
-
-def uninstall_iw3sp(game: dict):
+    prog(100, "IW3SP-MOD installation complete!")(game: dict):
     """
     Remove the DeckOps metadata file for IW3SP-MOD.
     Extracted mod files are left in place — they do not interfere with the
