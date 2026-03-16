@@ -16,11 +16,11 @@ DeckOps automates the installation of iw4x, CoD4x, IW3SP-MOD, and Plutonium on S
 
 ## 💾 Installation & Uninstall
 
-1. Press the Steam button → **Power** → **Switch to Desktop**
+1. Press the Steam button -> **Power** -> **Switch to Desktop**
 
 2. Download the **[DeckOps file](https://github.com/GalvarinoDev/DeckOps/releases/download/v1/DeckOps.desktop.download)** from this page
 
-3. Right-click the file → **Properties** → **Permissions** → tick **"Is executable"** → OK
+3. Right-click the file -> **Properties** -> **Permissions** -> tick **"Is executable"** -> OK
 
 4. Double-click it
    - **First time:** DeckOps installs automatically
@@ -33,16 +33,21 @@ DeckOps automates the installation of iw4x, CoD4x, IW3SP-MOD, and Plutonium on S
 ## Requirements
 
 - Steam Deck running SteamOS
-- Each game installed through Steam and launched at least once (both SP and MP modes)
+- Each game installed through Steam and launched at least once through Steam before running DeckOps
 - Plutonium games require a free account at [plutonium.pw](https://plutonium.pw)
+- GE-Proton will be automatically downloaded and installed by DeckOps if not already present
 
 > DeckOps will show which games haven't been launched yet and prevent you from selecting them until ready.
+
+> **GE-Proton** is set as the compatibility tool for all supported games. If you already have GE-Proton installed (e.g. via ProtonUp-Qt), DeckOps will use your existing installation and only download a newer version if one is available.
 
 ---
 
 ## ⚠️ After Installation
 
 **Launch Steam in Desktop Mode before switching to Game Mode.** This lets Steam reload the config changes DeckOps made. Then switch to Game Mode and play normally.
+
+> DeckOps sets GE-Proton as the compatibility tool for all supported games. Other games in your library are not affected.
 
 ---
 
@@ -61,8 +66,6 @@ DeckOps automates the installation of iw4x, CoD4x, IW3SP-MOD, and Plutonium on S
 | Black Ops II - Campaign | via Steam | LCD + OLED | SP | ✅ | ❌ | ✅ |
 | Black Ops II - Multiplayer & Zombies | Plutonium | OLED only | MP / ZM | ✅ | ✅ | ✅ |
 
-> A legitimate Steam copy of each game is required. DeckOps does not provide or distribute game files.
-
 > Gyro is implemented via Steam Input and works on all titles regardless of native client support.
 
 > **Steam Deck LCD:** Plutonium servers require OLED. For offline Campaign and Zombies on LCD, see [PlutoniumAltLauncher](https://github.com/framilano/PlutoniumAltLauncher).
@@ -72,13 +75,13 @@ DeckOps automates the installation of iw4x, CoD4x, IW3SP-MOD, and Plutonium on S
 ## 🔧 Troubleshooting
 
 **Shortcuts not using GE-Proton?**
-Go to **Settings → Repair Shortcuts** to re-apply GE-Proton and controller configs.
+Go to **Settings -> Repair Shortcuts** to re-apply GE-Proton and controller configs.
 
 **Controller profiles not working?**
-Go to **Settings → Re-apply Templates** to reinstall controller profiles.
+Go to **Settings -> Re-apply Templates** to reinstall controller profiles.
 
 **Game asks for Safe Mode or override config?**
-Choose **No** — DeckOps has already configured optimal settings.
+Choose **No** - DeckOps has already configured optimal settings.
 
 **Cloud save out of sync?**
 Choose **Keep Local** to preserve DeckOps settings.
@@ -99,9 +102,9 @@ DeckOps is an installer. The projects below are what actually make it work.
 
 **[IW3SP-MOD](https://gitea.com/JerryALT/iw3sp_mod)** - CoD4 Campaign mod by JerryALT.
 
-Steam artwork from [SteamGridDB](https://www.steamgriddb.com) — thanks to Moohoo, jarvis, Ramjez, Over, Uravity-PRO, and Maxine.
+Steam artwork from [SteamGridDB](https://www.steamgriddb.com) - thanks to Moohoo, jarvis, Ramjez, Over, Uravity-PRO, and Maxine.
 
-**[Claude](https://claude.ai)** by Anthropic — assisted in development.
+**[Claude](https://claude.ai)** by Anthropic - assisted in development.
 
 ---
 
@@ -110,3 +113,5 @@ Steam artwork from [SteamGridDB](https://www.steamgriddb.com) — thanks to Mooh
 [MIT License](LICENSE)
 
 DeckOps is not affiliated with Activision, Infinity Ward, Treyarch, or Valve. All trademarks belong to their respective owners.
+
+> A legitimate Steam copy of each game is required. DeckOps does not provide or distribute game files.
