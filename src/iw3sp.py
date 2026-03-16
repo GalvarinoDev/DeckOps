@@ -110,7 +110,8 @@ def install_iw3sp(game: dict, steam_root: str,
     script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "set_launch_iw3sp.sh")
     try:
         subprocess.run([
-            "xterm", "-title", "DeckOps - Applying launch option...",
+            "xterm", "-fa", "Monospace", "-fs", "12",
+            "-title", "DeckOps - Applying launch option...",
             "-e", "bash", script
         ], check=True)
     except Exception as ex:

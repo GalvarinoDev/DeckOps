@@ -1108,7 +1108,8 @@ class ControllerInfoScreen(QWidget):
             path = os.path.join(src_dir, script)
             if os.path.exists(path):
                 try:
-                    _sp.run(["xterm", "-title", "DeckOps - Applying launch option...",
+                    _sp.run(["xterm", "-fa", "Monospace", "-fs", "12",
+                             "-title", "DeckOps - Applying launch option...",
                              "-e", "bash", path], check=True)
                 except Exception:
                     pass
