@@ -19,7 +19,7 @@ echo ""
 
 zenity --question \
     --title="DeckOps Uninstaller" \
-    --text="This will restore all original game .exe files and remove ALL DeckOps and Plutonium data from your Wine prefixes.\n\nContinue?" \
+    --text="This will clear all DeckOps launch options, remove client files, and remove ALL DeckOps and Plutonium data from your Wine prefixes.\n\nContinue?" \
     --ok-label="Cancel" \
     --cancel-label="Yes, Uninstall" 2>/dev/null
 
@@ -146,9 +146,9 @@ restore_exe() {
 info "Restoring original game executables..."
 
 if [ -n "$STEAM_ROOT" ]; then
+    # Only Plutonium games (iw5mp, t4, t5, t6) use exe backups — iw3sp and iw4x
+    # now use Steam launch options instead of renaming, so no restore needed there.
     declare -A GAME_EXES=(
-        [7940]="iw3mp.exe iw3sp.exe"
-        [10190]="iw4mp.exe"
         [42690]="iw5mp.exe"
     )
     declare -A GAME_EXES_MULTI=(
@@ -182,14 +182,6 @@ info "Removing iw4x / cod4x client files..."
 if [ -n "$STEAM_ROOT" ]; then
     mw2_dir=$(find_install_dir 10190) || true
     if [ -n "$mw2_dir" ]; then
-        # iw4mp.exe (iw4x)
-        if [ -f "$mw2_dir/iw4mp.exe.bak" ]; then
-            rm -f "$mw2_dir/iw4mp.exe"
-            mv "$mw2_dir/iw4mp.exe.bak" "$mw2_dir/iw4mp.exe"
-            success "MW2: restored original iw4mp.exe from backup"
-        else
-            skip "MW2: iw4mp.exe.bak not found -- exe may already be original"
-        fi
         for f in "iw4x.dll" "iw4x.exe"; do
             [ -f "$mw2_dir/$f" ] && rm -f "$mw2_dir/$f" && success "Removed $f" || skip "$f not found"
         done
@@ -231,7 +223,94 @@ if [ -n "$STEAM_ROOT" ]; then
 fi
 echo ""
 
-info "Scanning all Wine prefixes for Plutonium..."
+info "Removing DeckOps launch options from localconfig.vdf..."
+
+python3 - << 'PYEOF'
+import os, re
+
+# Appids and the launch option strings DeckOps sets
+LAUNCH_OPTIONS = {
+    "7940":  "bash -c 'exec \"${@/iw3sp.exe/iw3sp_mod.exe}\"' -- %command%",
+    "10190": "bash -c 'exec \"${@/iw4mp.exe/iw4x.exe}\"' -- %command%",
+}
+
+steam_dir = os.path.expanduser("~/.local/share/Steam")
+userdata  = os.path.join(steam_dir, "userdata")
+
+if not os.path.isdir(userdata):
+    print("  No Steam userdata found — skipping.")
+    exit(0)
+
+def find_block_end(text, start):
+    depth = 0
+    i = start
+    while i < len(text):
+        if text[i] == '{':
+            depth += 1
+        elif text[i] == '}':
+            depth -= 1
+            if depth == 0:
+                return i
+        i += 1
+    return -1
+
+for uid in os.listdir(userdata):
+    if not uid.isdigit() or int(uid) < 10000:
+        continue
+    vdf_path = os.path.join(userdata, uid, "config", "localconfig.vdf")
+    if not os.path.exists(vdf_path):
+        continue
+
+    with open(vdf_path, "r", errors="replace") as f:
+        content = f.read()
+
+    modified = False
+    for appid, option in LAUNCH_OPTIONS.items():
+        key_match = re.search(r'"' + re.escape(appid) + r'"\s*\{', content, re.IGNORECASE)
+        if not key_match:
+            continue
+
+        app_open  = key_match.end() - 1
+        app_close = find_block_end(content, app_open)
+        if app_close == -1:
+            continue
+
+        app_inner = content[app_open + 1:app_close]
+
+        # Check cloud sub-block first
+        cloud_match = re.search(r'"cloud"\s*\{', app_inner, re.IGNORECASE)
+        if cloud_match:
+            cloud_open  = cloud_match.end() - 1
+            cloud_close = find_block_end(app_inner, cloud_open)
+            if cloud_close == -1:
+                continue
+            cloud_inner_start = app_open + 1 + cloud_open + 1
+            cloud_inner_end   = app_open + 1 + cloud_close
+            cloud_inner = content[cloud_inner_start:cloud_inner_end]
+
+            launch_pattern = re.compile(r'"LaunchOptions"\s*"[^"]*"', re.IGNORECASE)
+            if re.search(launch_pattern, cloud_inner) and option in cloud_inner:
+                new_cloud_inner = launch_pattern.sub('', cloud_inner)
+                content = content[:cloud_inner_start] + new_cloud_inner + content[cloud_inner_end:]
+                modified = True
+                print(f"  uid {uid}: cleared launch option for appid {appid}")
+        else:
+            inner_start = app_open + 1
+            launch_pattern = re.compile(r'"LaunchOptions"\s*"[^"]*"', re.IGNORECASE)
+            if re.search(launch_pattern, app_inner) and option in app_inner:
+                new_inner = launch_pattern.sub('', app_inner)
+                content = content[:inner_start] + new_inner + content[app_close:]
+                modified = True
+                print(f"  uid {uid}: cleared launch option for appid {appid}")
+
+    if modified:
+        with open(vdf_path, "w", errors="replace") as f:
+            f.write(content)
+    else:
+        print(f"  uid {uid}: no DeckOps launch options found")
+PYEOF
+
+echo ""
 
 if [ -n "$STEAM_ROOT" ]; then
     COMPATDATA="$STEAM_ROOT/steamapps/compatdata"
@@ -818,9 +897,9 @@ echo ""
 
 echo -e "${GREEN}${BOLD}  DeckOps fully uninstalled.${CLEAR}"
 echo ""
-echo "  Your Steam games are untouched. All original .exe files restored."
+echo "  Your Steam games are untouched. Steam launch options cleared."
 echo "  All Plutonium data removed from Wine prefixes."
-echo "  All IW3SP-MOD files removed from CoD4 folder."
+echo "  All IW3SP-MOD and IW4x client files removed."
 echo "  All DeckOps controller templates and profiles removed."
 echo ""
 
@@ -832,7 +911,7 @@ echo ""
 # Show summary dialog in background while countdown runs in terminal
 zenity --info \
     --title="DeckOps Uninstaller" \
-    --text="DeckOps fully uninstalled.\n\nYour Steam games are untouched. All original .exe files restored.\nAll Plutonium data removed from Wine prefixes.\nAll IW3SP-MOD files removed from CoD4 folder.\nAll DeckOps controller templates and profiles removed." \
+    --text="DeckOps fully uninstalled.\n\nYour Steam games are untouched. Steam launch options cleared.\nAll Plutonium data removed from Wine prefixes.\nAll IW3SP-MOD and IW4x client files removed.\nAll DeckOps controller templates and profiles removed." \
     --timeout=6 \
     2>/dev/null &
 
