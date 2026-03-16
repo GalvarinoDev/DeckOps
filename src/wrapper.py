@@ -226,26 +226,34 @@ def kill_steam():
     Terminate the Steam desktop client without triggering the SteamOS
     session manager (which would switch back to Game Mode).
 
-    Sends SIGTERM directly to the steam and steam.sh processes rather
-    than using `steam -shutdown` which goes through the session wrapper.
+    Targets ubuntu12_32/steam directly — this is the actual main Steam
+    process on SteamOS. Killing it triggers a graceful shutdown that writes
+    localconfig.vdf cleanly, matching what happens when the user closes
+    Steam manually. All child processes (steamwebhelper, srt-logger etc.)
+    die automatically when the parent is terminated.
     """
     import time
 
-    subprocess.run(["pkill", "-TERM", "-f", "steam.sh"], capture_output=True)
-    subprocess.run(["pkill", "-TERM", "-x", "steam"],    capture_output=True)
+    # SIGTERM to the main Steam process triggers graceful shutdown + config write
+    subprocess.run(["pkill", "-TERM", "-f", "ubuntu12_32/steam"], capture_output=True)
 
-    deadline = time.time() + 15
+    # Wait for all Steam processes to fully exit
+    deadline = time.time() + 20
     while time.time() < deadline:
-        r1 = subprocess.run(["pgrep", "-x", "steam"],    capture_output=True)
-        r2 = subprocess.run(["pgrep", "-f", "steam.sh"], capture_output=True)
-        if r1.returncode != 0 and r2.returncode != 0:
+        r = subprocess.run(
+            ["pgrep", "-f", "ubuntu12_32/steam"],
+            capture_output=True
+        )
+        if r.returncode != 0:
+            time.sleep(1)  # Brief extra wait for localconfig.vdf write to complete
             return
         time.sleep(1)
 
-    # Force kill if still running
-    subprocess.run(["pkill", "-9", "-f", "steam.sh"], capture_output=True)
-    subprocess.run(["pkill", "-9", "-x", "steam"],    capture_output=True)
-    time.sleep(2)
+    # Force kill if graceful shutdown timed out
+    subprocess.run(["pkill", "-9", "-f", "ubuntu12_32/steam"],  capture_output=True)
+    subprocess.run(["pkill", "-9", "-f", "steamwebhelper"],      capture_output=True)
+    subprocess.run(["pkill", "-9", "-f", "steam.sh"],            capture_output=True)
+    time.sleep(3)
 
 
 def set_steam_input_enabled(steam_root, appids=None):
