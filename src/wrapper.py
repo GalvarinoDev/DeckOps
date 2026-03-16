@@ -119,6 +119,8 @@ def set_launch_options(steam_root, appid, options):
     options     — launch option string to set, e.g. "iw4x.exe %command%"
     """
     appid = str(appid)
+    # Escape double quotes so the value is valid inside a VDF quoted string
+    vdf_options = options.replace('"', '\\"')
     userdata = os.path.join(steam_root, "userdata")
     if not os.path.exists(userdata):
         return
@@ -187,16 +189,16 @@ def set_launch_options(steam_root, appid, options):
 
             if launch_match:
                 existing = launch_match.group(2)
-                if options in existing:
+                if vdf_options in existing:
                     continue
-                new_options   = (existing.strip() + " " + options).strip()
+                new_options   = (existing.strip() + " " + vdf_options).strip()
                 new_cloud_inner = launch_pattern.sub(
                     lambda m: m.group(1) + new_options + m.group(3),
                     cloud_inner
                 )
             else:
                 new_cloud_inner = cloud_inner.rstrip() + \
-                    f'\n\t\t\t\t\t"LaunchOptions"\t\t"{options}"\n\t\t\t\t'
+                    f'\n\t\t\t\t\t"LaunchOptions"\t\t"{vdf_options}"\n\t\t\t\t'
 
             new_content = (
                 content[:cloud_inner_start] +
@@ -214,9 +216,9 @@ def set_launch_options(steam_root, appid, options):
 
             if launch_match:
                 existing = launch_match.group(2)
-                if options in existing:
+                if vdf_options in existing:
                     continue
-                new_options  = (existing.strip() + " " + options).strip()
+                new_options  = (existing.strip() + " " + vdf_options).strip()
                 new_app_inner = launch_pattern.sub(
                     lambda m: m.group(1) + new_options + m.group(3),
                     app_inner
@@ -226,7 +228,7 @@ def set_launch_options(steam_root, appid, options):
                 indent_match = re.search(r'\n(\t+)"', app_inner)
                 indent = indent_match.group(1) if indent_match else '\t\t\t'
                 new_app_inner = app_inner.rstrip() + \
-                    f'\n{indent}"LaunchOptions"\t\t"{options}"\n{indent[:-1]}'
+                    f'\n{indent}"LaunchOptions"\t\t"{vdf_options}"\n{indent[:-1]}'
 
             new_content = (
                 content[:app_open + 1] +
