@@ -1087,9 +1087,6 @@ class ControllerInfoScreen(QWidget):
         except Exception:
             pass
         self._go_management()
-        except Exception:
-            pass
-        self._go_management()
 
     def _go_management(self):
         root = find_steam_root()
