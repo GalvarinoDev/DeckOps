@@ -1,12 +1,13 @@
 """
 bootstrap.py — DeckOps pre-launch asset fetcher
 
-Downloads Russo One font and Steam header images into the assets folder
-before the PyQt5 UI initialises. Called from BootstrapScreen on a background
-thread so the UI can show progress.
+Downloads Steam header images into the assets folder before the PyQt5 UI
+initialises. Called from BootstrapScreen on a background thread so the UI
+can show progress.
 
-Music is NOT downloaded here. If assets/music/background.mp3 is present it
-will be played automatically. Users can drop any MP3 file there themselves.
+The Russo One font is bundled in the repo and does not need downloading.
+Music is NOT downloaded here — if assets/music/background.mp3 is present
+it will be played automatically.
 """
 
 import os
@@ -15,23 +16,9 @@ import urllib.request
 # ── paths ─────────────────────────────────────────────────────────────────────
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FONTS_DIR    = os.path.join(PROJECT_ROOT, "assets", "fonts")
 HEADERS_DIR  = os.path.join(PROJECT_ROOT, "assets", "images", "headers")
-MUSIC_DIR    = os.path.join(PROJECT_ROOT, "assets", "music")
 
-os.makedirs(FONTS_DIR,   exist_ok=True)
 os.makedirs(HEADERS_DIR, exist_ok=True)
-os.makedirs(MUSIC_DIR,   exist_ok=True)
-
-# ── font sources ──────────────────────────────────────────────────────────────
-# Russo One — hosted directly in the DeckOps repo, MIT licensed.
-
-FONT_FILE = "RussoOne-Regular.ttf"
-FONT_URL  = "https://raw.githubusercontent.com/GalvarinoDev/DeckOps/main/assets/fonts/RussoOne-Regular.ttf"
-
-FONTS = {
-    FONT_FILE: FONT_URL,
-}
 
 # ── Steam header images ───────────────────────────────────────────────────────
 
@@ -83,33 +70,39 @@ def run(on_progress=None, on_complete=None):
     if on_complete is None:
         on_complete = lambda ok: None
 
-    tasks = []
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    for filename, url in FONTS.items():
-        dest = os.path.join(FONTS_DIR, filename)
-        tasks.append((url, dest, f"Font: {filename}"))
+    tasks = []
 
     for appid in HEADER_APPIDS:
         url  = _HEADER_OVERRIDES.get(appid, _STEAM_CDN.format(appid=appid))
         dest = os.path.join(HEADERS_DIR, f"{appid}.jpg")
         tasks.append((url, dest, f"Header: {appid}.jpg"))
 
-    total  = len(tasks)
-    failed = 0
+    total     = len(tasks)
+    failed    = 0
+    completed = 0
+    lock      = threading.Lock()
 
-    for i, (url, dest, label) in enumerate(tasks):
-        pct = int(i / total * 100)
-        ok  = _download(url, dest, label,
-                        lambda msg, _p=pct: on_progress(_p, msg))
-        if not ok:
-            failed += 1
+    def _run_task(args):
+        nonlocal completed, failed
+        url, dest, label = args
+        ok = _download(url, dest, label, lambda msg, _l=label: on_progress(0, msg))
+        with lock:
+            completed += 1
+            pct = int(completed / total * 100)
+            on_progress(pct, label)
+            if not ok:
+                failed += 1
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(_run_task, t) for t in tasks]
+        for f in as_completed(futures):
+            f.result()  # re-raise any exceptions
 
     on_progress(100, "Assets ready.")
     on_complete(failed == 0)
-
-
-def fonts_ready() -> bool:
-    return os.path.exists(os.path.join(FONTS_DIR, FONT_FILE))
 
 
 def headers_ready() -> bool:
@@ -120,4 +113,4 @@ def headers_ready() -> bool:
 
 
 def all_ready() -> bool:
-    return fonts_ready() and headers_ready()
+    return headers_ready()

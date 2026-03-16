@@ -21,7 +21,6 @@ import urllib.request
 
 GITHUB_API   = "https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest"
 COMPAT_DIR   = os.path.expanduser("~/.local/share/Steam/compatibilitytools.d")
-STEAM_CONFIG = os.path.expanduser("~/.local/share/Steam/config/config.vdf")
 
 # Steam appids that DeckOps manages — GE-Proton will be set for all of these
 MANAGED_APPIDS = [
@@ -160,10 +159,18 @@ def install_ge_proton(on_progress=None):
         else:
             prog(85, "No checksum file available — skipping verification.")
 
-        # Extract
+        # Extract — shell out to tar which is significantly faster than
+        # Python's tarfile module for large archives like GE-Proton.
         prog(87, f"Extracting {version}...")
-        with tarfile.open(tarball_path, "r:gz") as tar:
-            tar.extractall(COMPAT_DIR)
+        import subprocess
+        result = subprocess.run(
+            ["tar", "-xzf", tarball_path, "-C", COMPAT_DIR],
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            # Fall back to Python tarfile if tar isn't available
+            with tarfile.open(tarball_path, "r:gz") as tar:
+                tar.extractall(COMPAT_DIR)
         prog(100, f"GE-Proton {version} installed.")
 
     return version
