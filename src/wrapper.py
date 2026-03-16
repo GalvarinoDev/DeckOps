@@ -146,16 +146,29 @@ def set_launch_options(steam_root, appid, options):
             continue
 
         def _find_block_end(text, start):
-            """Return the index of the closing brace matching the '{' at start."""
+            """
+            Return the index of the closing brace matching the '{' at start.
+
+            WARNING: Must skip braces inside quoted strings — VDF values like
+            bash substitutions (e.g. ${@/iw3sp.exe/iw3sp_mod.exe}) contain
+            { and } characters that must NOT be counted as block delimiters.
+            Failure to do this will corrupt localconfig.vdf by cutting blocks
+            short and trampling adjacent keys.
+            """
             depth = 0
             i = start
+            in_quote = False
             while i < len(text):
-                if text[i] == '{':
-                    depth += 1
-                elif text[i] == '}':
-                    depth -= 1
-                    if depth == 0:
-                        return i
+                c = text[i]
+                if c == '"' and (i == 0 or text[i-1] != '\\'):
+                    in_quote = not in_quote
+                elif not in_quote:
+                    if c == '{':
+                        depth += 1
+                    elif c == '}':
+                        depth -= 1
+                        if depth == 0:
+                            return i
                 i += 1
             return -1  # malformed
 
