@@ -14,7 +14,6 @@ CompatToolMapping written to:
 
 import json
 import os
-import re
 import shutil
 import tarfile
 import tempfile
@@ -171,71 +170,10 @@ def install_ge_proton(on_progress=None):
 
 
 # ── CompatToolMapping ─────────────────────────────────────────────────────────
+# Canonical implementation lives in wrapper.set_compat_tool.
+# Imported here so callers can use ge_proton.set_compat_tool as before.
 
-def set_compat_tool(appids, version):
-    """
-    Write CompatToolMapping entries in Steam's config.vdf for each appid.
-    Uses a simple text-based patch — finds or creates the CompatToolMapping
-    block and inserts/updates each appid entry.
-
-    appids  — list of appid strings, e.g. ["10190", "42690"]
-    version — GE-Proton version string, e.g. "GE-Proton10-28"
-    """
-    if not os.path.exists(STEAM_CONFIG):
-        raise FileNotFoundError(f"Steam config not found: {STEAM_CONFIG}")
-
-    with open(STEAM_CONFIG, "r", encoding="utf-8") as f:
-        data = f.read()
-
-    for appid in appids:
-        entry = (
-            f'\t\t\t\t"{appid}"\n'
-            f'\t\t\t\t{{\n'
-            f'\t\t\t\t\t"name"\t\t"{version}"\n'
-            f'\t\t\t\t\t"config"\t\t""\n'
-            f'\t\t\t\t\t"Priority"\t\t"250"\n'
-            f'\t\t\t\t}}\n'
-        )
-
-        # If appid block already exists, replace it
-        pattern = rf'(\t+"{re.escape(appid)}"\n\t+\{{[^}}]*\}})'
-        if re.search(pattern, data, re.MULTILINE):
-            data = re.sub(pattern, entry.rstrip('\n'), data, flags=re.MULTILINE)
-        else:
-            # Insert before closing brace of CompatToolMapping block
-            data = re.sub(
-                r'("CompatToolMapping"\s*\{)',
-                r'\1\n' + entry,
-                data,
-                count=1
-            )
-
-    # Create CompatToolMapping block if it doesn't exist at all
-    if '"CompatToolMapping"' not in data:
-        block = (
-            '\t\t\t"CompatToolMapping"\n'
-            '\t\t\t{\n'
-        )
-        for appid in appids:
-            block += (
-                f'\t\t\t\t"{appid}"\n'
-                f'\t\t\t\t{{\n'
-                f'\t\t\t\t\t"name"\t\t"{version}"\n'
-                f'\t\t\t\t\t"config"\t\t""\n'
-                f'\t\t\t\t\t"Priority"\t\t"250"\n'
-                f'\t\t\t\t}}\n'
-            )
-        block += '\t\t\t}\n'
-        # Insert before closing of Software/Valve/Steam block
-        data = re.sub(
-            r'("Steam"\s*\{)',
-            r'\1\n' + block,
-            data,
-            count=1
-        )
-
-    with open(STEAM_CONFIG, "w", encoding="utf-8") as f:
-        f.write(data)
+from wrapper import set_compat_tool  # noqa: F401
 
 
 # ── Public API ────────────────────────────────────────────────────────────────

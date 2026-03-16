@@ -29,7 +29,6 @@ import urllib.request
 STEAM_ROOT     = os.path.expanduser("~/.local/share/Steam")
 USERDATA_DIR   = os.path.join(STEAM_ROOT, "userdata")
 COMPAT_ROOT    = os.path.join(STEAM_ROOT, "steamapps", "compatdata")
-STEAM_CONFIG   = os.path.join(STEAM_ROOT, "config", "config.vdf")
 
 _HERE          = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT   = os.path.dirname(_HERE)
@@ -358,70 +357,23 @@ def _patch_configset(configset_path: str, key: str, template_name: str):
 
 def _assign_compat_tool(appid: int, prog):
     """
-    Set GE-Proton compat tool for a non-Steam shortcut.
-    Reads the installed GE-Proton version from DeckOps config and writes
-    a CompatToolMapping entry to Steam's config.vdf.
+    Set GE-Proton compat tool for a non-Steam shortcut appid.
+    Delegates to wrapper.set_compat_tool — single implementation, called here
+    and again from ge_proton.setup_ge_proton so the entry is written twice
+    and is harder for Steam to override.
     """
     try:
         import config as cfg
+        from wrapper import set_compat_tool
+
         ge_version = cfg.get_ge_proton_version()
-        
         if not ge_version:
             prog(f"    ⚠ No GE-Proton version found — skipping compat tool")
             return
-        
-        if not os.path.exists(STEAM_CONFIG):
-            prog(f"    ⚠ Steam config.vdf not found — skipping compat tool")
-            return
-        
-        appid_str = str(appid)
-        
-        with open(STEAM_CONFIG, "r", encoding="utf-8") as f:
-            data = f.read()
-        
-        entry = (
-            f'\t\t\t\t"{appid_str}"\n'
-            f'\t\t\t\t{{\n'
-            f'\t\t\t\t\t"name"\t\t"{ge_version}"\n'
-            f'\t\t\t\t\t"config"\t\t""\n'
-            f'\t\t\t\t\t"Priority"\t\t"250"\n'
-            f'\t\t\t\t}}\n'
-        )
-        
-        # If appid block already exists, replace it
-        pattern = rf'(\t+"{re.escape(appid_str)}"\n\t+\{{[^}}]*\}})'
-        if re.search(pattern, data, re.MULTILINE):
-            data = re.sub(pattern, entry.rstrip('\n'), data, flags=re.MULTILINE)
-        else:
-            # Insert after CompatToolMapping opening brace
-            data = re.sub(
-                r'("CompatToolMapping"\s*\{)',
-                r'\1\n' + entry,
-                data,
-                count=1
-            )
-        
-        # Create CompatToolMapping block if it doesn't exist at all
-        if '"CompatToolMapping"' not in data:
-            block = (
-                '\t\t\t"CompatToolMapping"\n'
-                '\t\t\t{\n'
-                + entry +
-                '\t\t\t}\n'
-            )
-            # Insert before closing of Software/Valve/Steam block
-            data = re.sub(
-                r'("Steam"\s*\{)',
-                r'\1\n' + block,
-                data,
-                count=1
-            )
-        
-        with open(STEAM_CONFIG, "w", encoding="utf-8") as f:
-            f.write(data)
-        
+
+        set_compat_tool([str(appid)], ge_version)
         prog(f"    ✓ GE-Proton: {ge_version}")
-        
+
     except Exception as ex:
         prog(f"    ⚠ Compat tool failed: {ex}")
 
