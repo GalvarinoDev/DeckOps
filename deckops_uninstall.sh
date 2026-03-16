@@ -582,30 +582,13 @@ echo ""
 
 info "Removing DeckOps controller templates..."
 
-TEMPLATE_DIR="$HOME/.steam/steam/controller_base/templates"
-for f in \
-    "controller_neptune_deckops_hold.vdf" \
-    "controller_neptune_deckops_toggle.vdf" \
-    "controller_neptune_deckops_other_hold.vdf" \
-    "controller_neptune_deckops_other_toggle.vdf" \
-    "controller_neptune_deckops_other.vdf"; do
-    target="$TEMPLATE_DIR/$f"
-    if [ -f "$target" ]; then
-        rm -f "$target" && success "Removed $f" || warn "Failed to remove $f"
-    else
-        skip "$f not found"
-    fi
-done
-echo ""
-
-info "Removing DeckOps controller templates from Steam..."
-
 TEMPLATES_DIR="$HOME/.steam/steam/controller_base/templates"
 DECKOPS_TEMPLATES=(
     "controller_neptune_deckops_hold.vdf"
     "controller_neptune_deckops_toggle.vdf"
     "controller_neptune_deckops_other_hold.vdf"
     "controller_neptune_deckops_other_toggle.vdf"
+    "controller_neptune_deckops_other.vdf"
 )
 
 for tpl in "${DECKOPS_TEMPLATES[@]}"; do
