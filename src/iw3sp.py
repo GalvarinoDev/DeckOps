@@ -105,14 +105,12 @@ def install_iw3sp(game: dict, steam_root: str,
     with open(meta_path, "w") as f:
         json.dump({"version": "4.1.5"}, f, indent=2)
 
-    # Write launch option by opening a terminal that runs the exact command
-    # confirmed to work manually. Terminal closes automatically when done.
+    # Write launch option via xterm — konsole conflicts with Qt
     prog(90, "Setting Steam launch option...")
     script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "set_launch_iw3sp.sh")
     try:
         subprocess.run([
-            "konsole", "--hide-menubar", "--hide-tabbar",
-            "--title", "DeckOps - Applying launch option...",
+            "xterm", "-title", "DeckOps - Applying launch option...",
             "-e", "bash", script
         ], check=True)
     except Exception as ex:
