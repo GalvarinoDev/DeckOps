@@ -10,7 +10,7 @@ if [ ! -d "$INSTALL_DIR" ] || [ -f "$LOCKFILE" ]; then
     touch "$LOCKFILE"
     curl -sL "$GITHUB_RAW/install.sh" | bash
     rm -f "$LOCKFILE"
-    exec bash
+    exit 0
 fi
 
 # ── Already installed — ask what to do ───────────────────────────────────────
@@ -44,14 +44,14 @@ case "$choice" in
         touch "$LOCKFILE"
         curl -sL "$GITHUB_RAW/install.sh" | bash
         rm -f "$LOCKFILE"
-        exec bash
+        exit 0
         ;;
     "Uninstall")
         if [ -f "$INSTALL_DIR/deckops_uninstall.sh" ]; then
-            exec bash "$INSTALL_DIR/deckops_uninstall.sh"
+            bash "$INSTALL_DIR/deckops_uninstall.sh"
         else
             curl -sL "$GITHUB_RAW/deckops_uninstall.sh" | bash
-            exec bash
         fi
+        exit 0
         ;;
 esac
