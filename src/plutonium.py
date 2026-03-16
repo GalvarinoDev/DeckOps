@@ -134,9 +134,17 @@ def launch_bootstrapper(proton_path: str, on_progress=None):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         "Accept": "*/*",
     }
-    req = urllib.request.Request(PLUT_BOOTSTRAPPER_URL, headers=_headers)
-    with urllib.request.urlopen(req, timeout=60) as r, open(bootstrapper, "wb") as f:
-        f.write(r.read())
+    import time
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(PLUT_BOOTSTRAPPER_URL, headers=_headers)
+            with urllib.request.urlopen(req, timeout=60) as r, open(bootstrapper, "wb") as f:
+                f.write(r.read())
+            break
+        except Exception as ex:
+            if attempt == 2:
+                raise
+            time.sleep(2 ** attempt)
     prog(15, "Launching Plutonium — please log in, then close the window when done.")
 
     env = os.environ.copy()
