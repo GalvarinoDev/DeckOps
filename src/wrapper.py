@@ -297,6 +297,76 @@ def set_steam_input_enabled(steam_root, appids=None):
                 f.write(content)
 
 
+STEAM_CONFIG = os.path.expanduser("~/.local/share/Steam/config/config.vdf")
+
+
+def set_compat_tool(appids, version):
+    """
+    Write CompatToolMapping entries in Steam's config.vdf for each appid.
+    Single source of truth — called from both ge_proton.py and shortcut.py
+    so the entries are written twice at different points in the install flow,
+    making it harder for Steam to override them.
+
+    Logic (in order, no overlap):
+      1. If the appid block already exists → replace it in place
+      2. Else if CompatToolMapping block exists → insert into it
+      3. Else → create the entire CompatToolMapping block from scratch
+
+    appids  — list of int or str appids, e.g. ["10190", "42690"]
+    version — GE-Proton version string, e.g. "GE-Proton10-32"
+    """
+    if not os.path.exists(STEAM_CONFIG):
+        raise FileNotFoundError(f"Steam config not found: {STEAM_CONFIG}")
+
+    with open(STEAM_CONFIG, "r", encoding="utf-8") as f:
+        data = f.read()
+
+    def _entry(appid_str):
+        return (
+            f'\t\t\t\t"{appid_str}"\n'
+            f'\t\t\t\t{{\n'
+            f'\t\t\t\t\t"name"\t\t"{version}"\n'
+            f'\t\t\t\t\t"config"\t\t""\n'
+            f'\t\t\t\t\t"Priority"\t\t"250"\n'
+            f'\t\t\t\t}}\n'
+        )
+
+    has_mapping = '"CompatToolMapping"' in data
+
+    if not has_mapping:
+        # Create the entire CompatToolMapping block and all entries at once
+        block = '\t\t\t"CompatToolMapping"\n\t\t\t{\n'
+        for appid in appids:
+            block += _entry(str(appid))
+        block += '\t\t\t}\n'
+        data = re.sub(
+            r'("Steam"\s*\{)',
+            r'\1\n' + block,
+            data,
+            count=1,
+        )
+    else:
+        # CompatToolMapping exists — replace or insert each appid entry
+        for appid in appids:
+            appid_str = str(appid)
+            entry = _entry(appid_str)
+            pattern = rf'(\t+"{re.escape(appid_str)}"\n\t+\{{[^}}]*\}})'
+            if re.search(pattern, data, re.MULTILINE):
+                # Replace existing block
+                data = re.sub(pattern, entry.rstrip('\n'), data, flags=re.MULTILINE)
+            else:
+                # Insert after CompatToolMapping opening brace
+                data = re.sub(
+                    r'("CompatToolMapping"\s*\{)',
+                    r'\1\n' + entry,
+                    data,
+                    count=1,
+                )
+
+    with open(STEAM_CONFIG, "w", encoding="utf-8") as f:
+        f.write(data)
+
+
 def set_default_launch_option(steam_root, appids_config):
     """
     Set the default launch option for games with multiple launch modes,
