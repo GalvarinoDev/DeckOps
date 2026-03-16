@@ -13,8 +13,10 @@ Progress is reported via a callback:
 """
 
 import os
+import sys
 import json
 import zipfile
+import subprocess
 import urllib.request
 
 BASE_URL      = "https://gitea.com/JerryALT/iw3sp_mod/releases/download/v4.1.5/iw3sp_mod_v4.1.5.zip"
@@ -103,6 +105,22 @@ def install_iw3sp(game: dict, steam_root: str,
     meta_path = os.path.join(install_dir, METADATA_FILE)
     with open(meta_path, "w") as f:
         json.dump({"version": "4.1.5"}, f, indent=2)
+
+    # Write launch option via a separate process so it is isolated from
+    # the Qt process and cannot be overwritten by anything still in memory.
+    prog(90, "Setting Steam launch option...")
+    src_dir = os.path.dirname(os.path.abspath(__file__))
+    try:
+        subprocess.run(
+            [sys.executable, "-c",
+             f"import sys; sys.path.insert(0, {repr(src_dir)}); "
+             f"from wrapper import set_launch_options; "
+             f"set_launch_options({repr(steam_root)}, '7940', "
+             f"\"bash -c 'exec \\\"${{@/iw3sp.exe/iw3sp_mod.exe}}\\\"' -- %command%\")"],
+            capture_output=True,
+        )
+    except Exception as ex:
+        prog(90, f"Warning: could not set launch option: {ex}")
 
     prog(100, "IW3SP-MOD installation complete!")
 
