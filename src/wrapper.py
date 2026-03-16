@@ -116,7 +116,7 @@ def set_launch_options(steam_root, appid, options):
 
     steam_root  — path to the Steam root directory
     appid       — int or str Steam appid
-    options     — launch option string to set, e.g. "PROTON_USE_NTSYNC=1 %command%"
+    options     — launch option string to set, e.g. "iw4x.exe %command%"
     """
     appid = str(appid)
     userdata = os.path.join(steam_root, "userdata")
@@ -133,59 +133,106 @@ def set_launch_options(steam_root, appid, options):
         with open(vdf_path, "r", errors="replace") as f:
             content = f.read()
 
-        # Find the apps section for this appid (case-insensitive key match)
-        # localconfig.vdf structure: "apps" { "APPID" { "LaunchOptions" "..." } }
-        app_pattern = re.compile(
-            r'("' + re.escape(appid) + r'"\s*\{)(.*?)(\})',
-            re.IGNORECASE | re.DOTALL
+        # Step 1: find the appid block using regex, then brace-depth parse to
+        # get its true boundaries (handles nested sub-blocks correctly).
+        key_pattern = re.compile(
+            r'"' + re.escape(appid) + r'"\s*\{',
+            re.IGNORECASE
         )
-        match = app_pattern.search(content)
+        key_match = key_pattern.search(content)
+        if not key_match:
+            continue
 
-        if match:
-            app_block = match.group(2)
+        def _find_block_end(text, start):
+            """Return the index of the closing brace matching the '{' at start."""
+            depth = 0
+            i = start
+            while i < len(text):
+                if text[i] == '{':
+                    depth += 1
+                elif text[i] == '}':
+                    depth -= 1
+                    if depth == 0:
+                        return i
+                i += 1
+            return -1  # malformed
+
+        app_open  = key_match.end() - 1   # position of '{'
+        app_close = _find_block_end(content, app_open)
+        if app_close == -1:
+            continue
+
+        app_inner = content[app_open + 1:app_close]
+
+        # Step 2: LaunchOptions lives inside the "cloud" sub-block.
+        # Find it within the app block using the same approach.
+        cloud_pattern = re.compile(r'"cloud"\s*\{', re.IGNORECASE)
+        cloud_match = cloud_pattern.search(app_inner)
+
+        if cloud_match:
+            cloud_open  = cloud_match.end() - 1
+            cloud_close = _find_block_end(app_inner, cloud_open)
+            if cloud_close == -1:
+                continue
+
+            cloud_inner       = app_inner[cloud_open + 1:cloud_close]
+            cloud_inner_start = app_open + 1 + cloud_open + 1
+            cloud_inner_end   = app_open + 1 + cloud_close
+
             launch_pattern = re.compile(
                 r'("LaunchOptions"\s*")([^"]*?)(")',
                 re.IGNORECASE
             )
-            launch_match = launch_pattern.search(app_block)
+            launch_match = launch_pattern.search(cloud_inner)
 
             if launch_match:
                 existing = launch_match.group(2)
-                # Don't duplicate if already present
                 if options in existing:
                     continue
-                # Append to existing options
-                new_options = (existing.strip() + " " + options).strip()
-                new_app_block = launch_pattern.sub(
+                new_options   = (existing.strip() + " " + options).strip()
+                new_cloud_inner = launch_pattern.sub(
                     lambda m: m.group(1) + new_options + m.group(3),
-                    app_block
+                    cloud_inner
                 )
             else:
-                # No LaunchOptions key yet — insert one
-                new_app_block = app_block.rstrip() + \
+                new_cloud_inner = cloud_inner.rstrip() + \
+                    f'\n\t\t\t\t\t"LaunchOptions"\t\t"{options}"\n\t\t\t\t'
+
+            new_content = (
+                content[:cloud_inner_start] +
+                new_cloud_inner +
+                content[cloud_inner_end:]
+            )
+
+        else:
+            # No cloud sub-block — insert LaunchOptions directly in the app block
+            launch_pattern = re.compile(
+                r'("LaunchOptions"\s*")([^"]*?)(")',
+                re.IGNORECASE
+            )
+            launch_match = launch_pattern.search(app_inner)
+
+            if launch_match:
+                existing = launch_match.group(2)
+                if options in existing:
+                    continue
+                new_options  = (existing.strip() + " " + options).strip()
+                new_app_inner = launch_pattern.sub(
+                    lambda m: m.group(1) + new_options + m.group(3),
+                    app_inner
+                )
+            else:
+                new_app_inner = app_inner.rstrip() + \
                     f'\n\t\t\t"LaunchOptions"\t\t"{options}"\n\t\t'
 
             new_content = (
-                content[:match.start(2)] +
-                new_app_block +
-                content[match.end(2):]
+                content[:app_open + 1] +
+                new_app_inner +
+                content[app_close:]
             )
-        else:
-            # appid block doesn't exist at all — skip rather than corrupt the vdf
-            continue
 
         with open(vdf_path, "w", errors="replace") as f:
             f.write(new_content)
-
-
-def set_ntsync_launch_options(steam_root, appids):
-    """
-    Apply PROTON_USE_NTSYNC=1 %command% to all given appids.
-
-    appids — list of int or str appids
-    """
-    for appid in appids:
-        set_launch_options(steam_root, appid, "PROTON_USE_NTSYNC=1 %command%")
 
 
 def kill_steam():
