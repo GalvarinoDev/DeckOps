@@ -1,1 +1,3 @@
 PyQt5>=5.15.0
+pygame
+vdf
