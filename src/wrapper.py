@@ -111,8 +111,10 @@ def set_launch_options(steam_root, appid, options):
     Set or append launch options for a Steam game in localconfig.vdf.
 
     Finds all Steam user accounts under steam_root/userdata and updates
-    the LaunchOptions entry for the given appid in each one. If the option
-    string is already present it is not duplicated.
+    the LaunchOptions entry for the given appid in each one. Always writes
+    to the flat app block — NOT inside any cloud sub-block. Steam's UI reads
+    LaunchOptions from the flat block; writing to the cloud sub-block causes
+    the option to be invisible in Steam properties even if correctly written.
 
     steam_root  — path to the Steam root directory
     appid       — int or str Steam appid
@@ -135,8 +137,14 @@ def set_launch_options(steam_root, appid, options):
         with open(vdf_path, "r", errors="replace") as f:
             content = f.read()
 
-        # Step 1: find the appid block using regex, then brace-depth parse to
-        # get its true boundaries (handles nested sub-blocks correctly).
+        # Find the appid block using regex, then brace-depth parse to get its
+        # true boundaries.
+        #
+        # WARNING: Must skip braces inside quoted strings — VDF values like
+        # bash substitutions (e.g. ${@/iw3sp.exe/iw3sp_mod.exe}) contain
+        # { and } characters that must NOT be counted as block delimiters.
+        # Failure to do this will corrupt localconfig.vdf by cutting blocks
+        # short and trampling adjacent keys.
         key_pattern = re.compile(
             r'"' + re.escape(appid) + r'"\s*\{',
             re.IGNORECASE
@@ -146,15 +154,6 @@ def set_launch_options(steam_root, appid, options):
             continue
 
         def _find_block_end(text, start):
-            """
-            Return the index of the closing brace matching the '{' at start.
-
-            WARNING: Must skip braces inside quoted strings — VDF values like
-            bash substitutions (e.g. ${@/iw3sp.exe/iw3sp_mod.exe}) contain
-            { and } characters that must NOT be counted as block delimiters.
-            Failure to do this will corrupt localconfig.vdf by cutting blocks
-            short and trampling adjacent keys.
-            """
             depth = 0
             i = start
             in_quote = False
@@ -172,82 +171,51 @@ def set_launch_options(steam_root, appid, options):
                 i += 1
             return -1  # malformed
 
-        app_open  = key_match.end() - 1   # position of '{'
+        app_open  = key_match.end() - 1
         app_close = _find_block_end(content, app_open)
         if app_close == -1:
             continue
 
         app_inner = content[app_open + 1:app_close]
 
-        # Step 2: LaunchOptions lives inside the "cloud" sub-block.
-        # Find it within the app block using the same approach.
-        cloud_pattern = re.compile(r'"cloud"\s*\{', re.IGNORECASE)
-        cloud_match = cloud_pattern.search(app_inner)
+        # Always write LaunchOptions directly in the flat app block.
+        # Steam reads LaunchOptions from here — the cloud sub-block value
+        # is NOT shown in Steam properties and should never be written to.
+        launch_pattern = re.compile(
+            r'("LaunchOptions"\s*")([^"]*?)(")',
+            re.IGNORECASE
+        )
 
-        if cloud_match:
-            cloud_open  = cloud_match.end() - 1
-            cloud_close = _find_block_end(app_inner, cloud_open)
-            if cloud_close == -1:
+        # Only match LaunchOptions in the flat block, not inside sub-blocks.
+        # Find the first sub-block start so we only search before it.
+        subblock_match = re.search(r'"[^"]+"\s*\{', app_inner)
+        flat_section = app_inner[:subblock_match.start()] if subblock_match else app_inner
+
+        launch_match = launch_pattern.search(flat_section)
+
+        if launch_match:
+            existing = launch_match.group(2)
+            if vdf_options in existing:
                 continue
-
-            cloud_inner       = app_inner[cloud_open + 1:cloud_close]
-            cloud_inner_start = app_open + 1 + cloud_open + 1
-            cloud_inner_end   = app_open + 1 + cloud_close
-
-            launch_pattern = re.compile(
-                r'("LaunchOptions"\s*")([^"]*?)(")',
-                re.IGNORECASE
+            new_options  = (existing.strip() + " " + vdf_options).strip()
+            new_app_inner = launch_pattern.sub(
+                lambda m: m.group(1) + new_options + m.group(3),
+                app_inner,
+                count=1
             )
-            launch_match = launch_pattern.search(cloud_inner)
-
-            if launch_match:
-                existing = launch_match.group(2)
-                if vdf_options in existing:
-                    continue
-                new_options   = (existing.strip() + " " + vdf_options).strip()
-                new_cloud_inner = launch_pattern.sub(
-                    lambda m: m.group(1) + new_options + m.group(3),
-                    cloud_inner
-                )
-            else:
-                new_cloud_inner = cloud_inner.rstrip() + \
-                    f'\n\t\t\t\t\t"LaunchOptions"\t\t"{vdf_options}"\n\t\t\t\t'
-
-            new_content = (
-                content[:cloud_inner_start] +
-                new_cloud_inner +
-                content[cloud_inner_end:]
-            )
-
         else:
-            # No cloud sub-block — insert LaunchOptions directly in the app block
-            launch_pattern = re.compile(
-                r'("LaunchOptions"\s*")([^"]*?)(")',
-                re.IGNORECASE
-            )
-            launch_match = launch_pattern.search(app_inner)
+            # Insert before the first sub-block, or at end if no sub-blocks
+            indent_match = re.search(r'\n(\t+)"', flat_section)
+            indent = indent_match.group(1) if indent_match else '\t\t\t\t\t\t'
+            insert_pos = subblock_match.start() if subblock_match else len(app_inner)
+            insert_str = f'{indent}"LaunchOptions"\t\t"{vdf_options}"\n'
+            new_app_inner = app_inner[:insert_pos] + insert_str + app_inner[insert_pos:]
 
-            if launch_match:
-                existing = launch_match.group(2)
-                if vdf_options in existing:
-                    continue
-                new_options  = (existing.strip() + " " + vdf_options).strip()
-                new_app_inner = launch_pattern.sub(
-                    lambda m: m.group(1) + new_options + m.group(3),
-                    app_inner
-                )
-            else:
-                # Detect indentation from existing keys in the block
-                indent_match = re.search(r'\n(\t+)"', app_inner)
-                indent = indent_match.group(1) if indent_match else '\t\t\t'
-                new_app_inner = app_inner.rstrip() + \
-                    f'\n{indent}"LaunchOptions"\t\t"{vdf_options}"\n{indent[:-1]}'
-
-            new_content = (
-                content[:app_open + 1] +
-                new_app_inner +
-                content[app_close:]
-            )
+        new_content = (
+            content[:app_open + 1] +
+            new_app_inner +
+            content[app_close:]
+        )
 
         with open(vdf_path, "w", errors="replace") as f:
             f.write(new_content)
