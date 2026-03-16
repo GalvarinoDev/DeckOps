@@ -941,7 +941,7 @@ class ManagementScreen(QWidget):
         title = QLabel("DECKOPS"); title.setFont(font(22, display=True))
         title.setStyleSheet("color:#FFF;background:transparent;")
         hl.addWidget(title); hl.addStretch()
-        guide_btn = _btn("📋  Setup Guide", C_BLUE_BTN, size=11, h=36); guide_btn.setFixedWidth(140)
+        guide_btn = _btn("📋 Guide", C_BLUE_BTN, size=11, h=36); guide_btn.setFixedWidth(140)
         guide_btn.clicked.connect(lambda: self.stack.setCurrentIndex(7))
         hl.addWidget(guide_btn)
         hl.addSpacing(8)
@@ -1094,7 +1094,7 @@ class ControllerInfoScreen(QWidget):
 
         lay.addStretch()
 
-        cont = _btn("Launch Steam & Continue  >>", C_IW, h=52)
+        cont = _btn("Continue  >>", C_IW, h=52)
         cont.clicked.connect(self._launch_steam_and_continue)
         cw = QHBoxLayout(); cw.addStretch(); cw.addWidget(cont, stretch=1); cw.addStretch()
         lay.addLayout(cw)
@@ -1150,7 +1150,7 @@ class ConfigureScreen(QWidget):
         lay.addWidget(_lbl("Controller Profiles", 14, "#CCC", align=Qt.AlignLeft))
         cr = QHBoxLayout(); cr.setSpacing(12)
         ctrl_btn  = _btn("Re-apply Templates", C_DARK_BTN, size=12, h=40)
-        guide_btn = _btn("Setup Guide", C_BLUE_BTN, size=12, h=40)
+        guide_btn = _btn("Guide", C_BLUE_BTN, size=12, h=40)
         ctrl_btn.clicked.connect(self._apply_controller_profiles)
         guide_btn.clicked.connect(lambda: self.stack.setCurrentIndex(7))
         cr.addWidget(ctrl_btn); cr.addWidget(guide_btn); cr.addStretch()
