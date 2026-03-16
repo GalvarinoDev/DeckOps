@@ -242,15 +242,25 @@ if not os.path.isdir(userdata):
     exit(0)
 
 def find_block_end(text, start):
+    """
+    WARNING: Must skip braces inside quoted strings — bash substitutions
+    like ${@/iw3sp.exe/iw3sp_mod.exe} contain } that must NOT be counted
+    as block delimiters. Failure corrupts localconfig.vdf.
+    """
     depth = 0
     i = start
+    in_quote = False
     while i < len(text):
-        if text[i] == '{':
-            depth += 1
-        elif text[i] == '}':
-            depth -= 1
-            if depth == 0:
-                return i
+        c = text[i]
+        if c == '"' and (i == 0 or text[i-1] != '\\'):
+            in_quote = not in_quote
+        elif not in_quote:
+            if c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+                if depth == 0:
+                    return i
         i += 1
     return -1
 
@@ -277,31 +287,21 @@ for uid in os.listdir(userdata):
 
         app_inner = content[app_open + 1:app_close]
 
-        # Check cloud sub-block first
-        cloud_match = re.search(r'"cloud"\s*\{', app_inner, re.IGNORECASE)
-        if cloud_match:
-            cloud_open  = cloud_match.end() - 1
-            cloud_close = find_block_end(app_inner, cloud_open)
-            if cloud_close == -1:
-                continue
-            cloud_inner_start = app_open + 1 + cloud_open + 1
-            cloud_inner_end   = app_open + 1 + cloud_close
-            cloud_inner = content[cloud_inner_start:cloud_inner_end]
+        # Only remove from the flat block (before any sub-blocks)
+        # Steam reads LaunchOptions from the flat block, not sub-blocks.
+        subblock_match = re.search(r'"[^"]+"\s*\{', app_inner)
+        flat_section = app_inner[:subblock_match.start()] if subblock_match else app_inner
 
-            launch_pattern = re.compile(r'"LaunchOptions"\s*"[^"]*"', re.IGNORECASE)
-            if re.search(launch_pattern, cloud_inner) and option in cloud_inner:
-                new_cloud_inner = launch_pattern.sub('', cloud_inner)
-                content = content[:cloud_inner_start] + new_cloud_inner + content[cloud_inner_end:]
-                modified = True
-                print(f"  uid {uid}: cleared launch option for appid {appid}")
-        else:
-            inner_start = app_open + 1
-            launch_pattern = re.compile(r'"LaunchOptions"\s*"[^"]*"', re.IGNORECASE)
-            if re.search(launch_pattern, app_inner) and option in app_inner:
-                new_inner = launch_pattern.sub('', app_inner)
-                content = content[:inner_start] + new_inner + content[app_close:]
-                modified = True
-                print(f"  uid {uid}: cleared launch option for appid {appid}")
+        launch_pattern = re.compile(r'"LaunchOptions"\s*"[^"]*"', re.IGNORECASE)
+        if re.search(launch_pattern, flat_section) and option in flat_section:
+            new_flat = launch_pattern.sub('', flat_section)
+            if subblock_match:
+                new_app_inner = new_flat + app_inner[subblock_match.start():]
+            else:
+                new_app_inner = new_flat
+            content = content[:app_open + 1] + new_app_inner + content[app_close:]
+            modified = True
+            print(f"  uid {uid}: cleared launch option for appid {appid}")
 
     if modified:
         with open(vdf_path, "w", errors="replace") as f:
@@ -582,13 +582,30 @@ echo ""
 
 info "Removing DeckOps controller templates..."
 
+TEMPLATE_DIR="$HOME/.steam/steam/controller_base/templates"
+for f in \
+    "controller_neptune_deckops_hold.vdf" \
+    "controller_neptune_deckops_toggle.vdf" \
+    "controller_neptune_deckops_other_hold.vdf" \
+    "controller_neptune_deckops_other_toggle.vdf" \
+    "controller_neptune_deckops_other.vdf"; do
+    target="$TEMPLATE_DIR/$f"
+    if [ -f "$target" ]; then
+        rm -f "$target" && success "Removed $f" || warn "Failed to remove $f"
+    else
+        skip "$f not found"
+    fi
+done
+echo ""
+
+info "Removing DeckOps controller templates from Steam..."
+
 TEMPLATES_DIR="$HOME/.steam/steam/controller_base/templates"
 DECKOPS_TEMPLATES=(
     "controller_neptune_deckops_hold.vdf"
     "controller_neptune_deckops_toggle.vdf"
     "controller_neptune_deckops_other_hold.vdf"
     "controller_neptune_deckops_other_toggle.vdf"
-    "controller_neptune_deckops_other.vdf"
 )
 
 for tpl in "${DECKOPS_TEMPLATES[@]}"; do
