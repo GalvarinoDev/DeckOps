@@ -109,9 +109,13 @@ def install_iw3sp(game: dict, steam_root: str,
     prog(90, "Setting Steam launch option...")
     script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "set_launch_iw3sp.sh")
     try:
-        subprocess.run(["bash", script], capture_output=True)
+        result = subprocess.run(["bash", script], capture_output=True, text=True)
+        if result.returncode == 0:
+            prog(90, "Launch option set.")
+        else:
+            prog(90, f"Warning: script exited {result.returncode}: {result.stderr.strip()}")
     except Exception as ex:
-        prog(90, f"Warning: could not set launch option: {ex}")
+        prog(90, f"Warning: could not run script: {ex}")
 
     prog(100, "IW3SP-MOD installation complete!")
 

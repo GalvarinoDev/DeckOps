@@ -168,9 +168,13 @@ def install_iw4x(game: dict, steam_root: str,
     prog(92, "Setting Steam launch option...")
     script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "set_launch_iw4x.sh")
     try:
-        subprocess.run(["bash", script], capture_output=True)
+        result = subprocess.run(["bash", script], capture_output=True, text=True)
+        if result.returncode == 0:
+            prog(92, "Launch option set.")
+        else:
+            prog(92, f"Warning: script exited {result.returncode}: {result.stderr.strip()}")
     except Exception as ex:
-        prog(92, f"Warning: could not set launch option: {ex}")
+        prog(92, f"Warning: could not run script: {ex}")
 
     prog(100, "IW4x installation complete!")
 
