@@ -1,13 +1,12 @@
 """
 bootstrap.py — DeckOps pre-launch asset fetcher
 
-Downloads Steam header images into the assets folder before the PyQt5 UI
-initialises. Called from BootstrapScreen on a background thread so the UI
-can show progress.
+Downloads Russo One font and Steam header images into the assets folder
+before the PyQt5 UI initialises. Called from BootstrapScreen on a background
+thread so the UI can show progress.
 
-The Russo One font is bundled in the repo and does not need downloading.
-Music is NOT downloaded here — if assets/music/background.mp3 is present
-it will be played automatically.
+Music is NOT downloaded here. If assets/music/background.mp3 is present it
+will be played automatically. Users can drop any MP3 file there themselves.
 """
 
 import os
@@ -16,9 +15,23 @@ import urllib.request
 # ── paths ─────────────────────────────────────────────────────────────────────
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FONTS_DIR    = os.path.join(PROJECT_ROOT, "assets", "fonts")
 HEADERS_DIR  = os.path.join(PROJECT_ROOT, "assets", "images", "headers")
+MUSIC_DIR    = os.path.join(PROJECT_ROOT, "assets", "music")
 
+os.makedirs(FONTS_DIR,   exist_ok=True)
 os.makedirs(HEADERS_DIR, exist_ok=True)
+os.makedirs(MUSIC_DIR,   exist_ok=True)
+
+# ── font sources ──────────────────────────────────────────────────────────────
+# Russo One — hosted directly in the DeckOps repo, MIT licensed.
+
+FONT_FILE = "RussoOne-Regular.ttf"
+FONT_URL  = "https://raw.githubusercontent.com/GalvarinoDev/DeckOps/main/assets/fonts/RussoOne-Regular.ttf"
+
+FONTS = {
+    FONT_FILE: FONT_URL,
+}
 
 # ── Steam header images ───────────────────────────────────────────────────────
 
@@ -50,16 +63,20 @@ def _download(url: str, dest: str, label: str, on_progress) -> bool:
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         "Accept": "*/*",
     }
-    try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=30) as r:
-            with open(dest, "wb") as f:
-                f.write(r.read())
-        on_progress(f"  checkmark  {label}")
-        return True
-    except Exception as e:
-        on_progress(f"  fail  {label} failed: {e}")
-        return False
+    import time
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=30) as r:
+                with open(dest, "wb") as f:
+                    f.write(r.read())
+            on_progress(f"  checkmark  {label}")
+            return True
+        except Exception as e:
+            if attempt == 2:
+                on_progress(f"  fail  {label} failed: {e}")
+                return False
+            time.sleep(2 ** attempt)
 
 
 # ── public API ────────────────────────────────────────────────────────────────
@@ -74,6 +91,10 @@ def run(on_progress=None, on_complete=None):
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     tasks = []
+
+    for filename, url in FONTS.items():
+        dest = os.path.join(FONTS_DIR, filename)
+        tasks.append((url, dest, f"Font: {filename}"))
 
     for appid in HEADER_APPIDS:
         url  = _HEADER_OVERRIDES.get(appid, _STEAM_CDN.format(appid=appid))
@@ -105,6 +126,10 @@ def run(on_progress=None, on_complete=None):
     on_complete(failed == 0)
 
 
+def fonts_ready() -> bool:
+    return os.path.exists(os.path.join(FONTS_DIR, FONT_FILE))
+
+
 def headers_ready() -> bool:
     return all(
         os.path.exists(os.path.join(HEADERS_DIR, f"{appid}.jpg"))
@@ -113,4 +138,4 @@ def headers_ready() -> bool:
 
 
 def all_ready() -> bool:
-    return headers_ready()
+    return fonts_ready() and headers_ready()
