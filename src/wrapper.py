@@ -222,8 +222,11 @@ def set_launch_options(steam_root, appid, options):
                     app_inner
                 )
             else:
+                # Detect indentation from existing keys in the block
+                indent_match = re.search(r'\n(\t+)"', app_inner)
+                indent = indent_match.group(1) if indent_match else '\t\t\t'
                 new_app_inner = app_inner.rstrip() + \
-                    f'\n\t\t\t"LaunchOptions"\t\t"{options}"\n\t\t'
+                    f'\n{indent}"LaunchOptions"\t\t"{options}"\n{indent[:-1]}'
 
             new_content = (
                 content[:app_open + 1] +
