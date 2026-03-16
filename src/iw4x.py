@@ -166,7 +166,7 @@ def install_iw4x(game: dict, steam_root: str,
 
     # Write launch option via dedicated shell script while Steam is closed
     prog(92, "Setting Steam launch option...")
-    script = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src", "set_launch_iw4x.sh")
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "set_launch_iw4x.sh")
     try:
         subprocess.run(["bash", script], capture_output=True)
     except Exception as ex:
