@@ -104,7 +104,10 @@ def install_iw3sp(game: dict, steam_root: str,
     with open(meta_path, "w") as f:
         json.dump({"version": "4.1.5"}, f, indent=2)
 
-    prog(100, "IW3SP-MOD installation complete!")(game: dict):
+    prog(100, "IW3SP-MOD installation complete!")
+
+
+def uninstall_iw3sp(game: dict):
     """
     Remove the DeckOps metadata file for IW3SP-MOD.
     Extracted mod files are left in place — they do not interfere with the
