@@ -164,14 +164,12 @@ def install_iw4x(game: dict, steam_root: str,
     if errors:
         raise RuntimeError("iwd download failed:\n" + "\n".join(errors))
 
-    # Write launch option by opening a terminal that runs the exact command
-    # confirmed to work manually. Terminal closes automatically when done.
+    # Write launch option via xterm — konsole conflicts with Qt
     prog(92, "Setting Steam launch option...")
     script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "set_launch_iw4x.sh")
     try:
         subprocess.run([
-            "konsole", "--hide-menubar", "--hide-tabbar",
-            "--title", "DeckOps - Applying launch option...",
+            "xterm", "-title", "DeckOps - Applying launch option...",
             "-e", "bash", script
         ], check=True)
     except Exception as ex:
