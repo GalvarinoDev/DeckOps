@@ -598,6 +598,20 @@ class InstallScreen(QWidget):
             except Exception as ex:
                 self._s.log.emit(f"  Launch options skipped: {ex}")
 
+        _iw4x_launch_set = False
+        def _set_iw4x_launch_option():
+            nonlocal _iw4x_launch_set
+            if _iw4x_launch_set or not has_iw4x:
+                return
+            try:
+                from wrapper import set_launch_options
+                set_launch_options(self.steam_root, "10190",
+                                   "bash -c 'exec \"${@/iw4mp.exe/iw4x.exe}\"' -- %command%")
+                self._s.log.emit("✓  iw4x launch option set")
+                _iw4x_launch_set = True
+            except Exception as ex:
+                self._s.log.emit(f"  iw4x launch option skipped: {ex}")
+
         # ── GE-Proton download + extract (Steam still running — no config.vdf write yet) ──
         try:
             self._s.progress.emit(2, "Installing GE-Proton...")
@@ -702,6 +716,7 @@ class InstallScreen(QWidget):
             _apply_compat()
             _assign_profiles()
             _set_launch_defaults()
+            _set_iw4x_launch_option()
 
             plut_selected = [(k, gd, g) for k, gd, g in self.selected if KEY_CLIENT.get(k) == "plutonium"]
             total_plut = len(plut_selected)
@@ -734,6 +749,7 @@ class InstallScreen(QWidget):
                 _apply_compat()
                 _assign_profiles()
                 _set_launch_defaults()
+                _set_iw4x_launch_option()
 
             cod4_selected = [(k, gd, g) for k, gd, g in self.selected if KEY_CLIENT.get(k) in ("cod4x", "iw3sp")]
             for key, gd, game in cod4_selected:
@@ -791,8 +807,7 @@ class InstallScreen(QWidget):
             _apply_compat()
             _assign_profiles()
             _set_launch_defaults()
-
-        # ── Non-Steam shortcuts for MP modes ──────────────────────────────────
+            _set_iw4x_launch_option() for MP modes ──────────────────────────────────
         try:
             from shortcut import create_shortcuts
             self._s.log.emit("Creating non-Steam shortcuts...")
@@ -941,7 +956,7 @@ class ManagementScreen(QWidget):
         title = QLabel("DECKOPS"); title.setFont(font(22, display=True))
         title.setStyleSheet("color:#FFF;background:transparent;")
         hl.addWidget(title); hl.addStretch()
-        guide_btn = _btn("📋 Guide", C_BLUE_BTN, size=11, h=36); guide_btn.setFixedWidth(140)
+        guide_btn = _btn("📋  Setup Guide", C_BLUE_BTN, size=11, h=36); guide_btn.setFixedWidth(140)
         guide_btn.clicked.connect(lambda: self.stack.setCurrentIndex(7))
         hl.addWidget(guide_btn)
         hl.addSpacing(8)
@@ -1094,7 +1109,7 @@ class ControllerInfoScreen(QWidget):
 
         lay.addStretch()
 
-        cont = _btn("Continue  >>", C_IW, h=52)
+        cont = _btn("Launch Steam & Continue  >>", C_IW, h=52)
         cont.clicked.connect(self._launch_steam_and_continue)
         cw = QHBoxLayout(); cw.addStretch(); cw.addWidget(cont, stretch=1); cw.addStretch()
         lay.addLayout(cw)
@@ -1150,7 +1165,7 @@ class ConfigureScreen(QWidget):
         lay.addWidget(_lbl("Controller Profiles", 14, "#CCC", align=Qt.AlignLeft))
         cr = QHBoxLayout(); cr.setSpacing(12)
         ctrl_btn  = _btn("Re-apply Templates", C_DARK_BTN, size=12, h=40)
-        guide_btn = _btn("Guide", C_BLUE_BTN, size=12, h=40)
+        guide_btn = _btn("Setup Guide", C_BLUE_BTN, size=12, h=40)
         ctrl_btn.clicked.connect(self._apply_controller_profiles)
         guide_btn.clicked.connect(lambda: self.stack.setCurrentIndex(7))
         cr.addWidget(ctrl_btn); cr.addWidget(guide_btn); cr.addStretch()
