@@ -601,7 +601,7 @@ class InstallScreen(QWidget):
         _iw4x_launch_set = False
         def _set_iw4x_launch_option():
             nonlocal _iw4x_launch_set
-            if _iw4x_launch_set or not has_iw4x:
+            if not has_iw4x:
                 return
             try:
                 from wrapper import set_launch_options
@@ -611,6 +611,17 @@ class InstallScreen(QWidget):
                 _iw4x_launch_set = True
             except Exception as ex:
                 self._s.log.emit(f"  iw4x launch option skipped: {ex}")
+
+        def _set_iw3sp_launch_option():
+            if not has_cod4:
+                return
+            try:
+                from wrapper import set_launch_options
+                set_launch_options(self.steam_root, "7940",
+                                   "bash -c 'exec \"${@/iw3sp.exe/iw3sp_mod.exe}\"' -- %command%")
+                self._s.log.emit("✓  iw3sp launch option set")
+            except Exception as ex:
+                self._s.log.emit(f"  iw3sp launch option skipped: {ex}")
 
         # ── GE-Proton download + extract (Steam still running — no config.vdf write yet) ──
         try:
@@ -717,6 +728,7 @@ class InstallScreen(QWidget):
             _assign_profiles()
             _set_launch_defaults()
             _set_iw4x_launch_option()
+            _set_iw3sp_launch_option()
 
             plut_selected = [(k, gd, g) for k, gd, g in self.selected if KEY_CLIENT.get(k) == "plutonium"]
             total_plut = len(plut_selected)
@@ -750,6 +762,7 @@ class InstallScreen(QWidget):
                 _assign_profiles()
                 _set_launch_defaults()
                 _set_iw4x_launch_option()
+                _set_iw3sp_launch_option()
 
             cod4_selected = [(k, gd, g) for k, gd, g in self.selected if KEY_CLIENT.get(k) in ("cod4x", "iw3sp")]
             for key, gd, game in cod4_selected:
@@ -807,7 +820,10 @@ class InstallScreen(QWidget):
             _apply_compat()
             _assign_profiles()
             _set_launch_defaults()
-            _set_iw4x_launch_option() for MP modes ──────────────────────────────────
+            _set_iw4x_launch_option()
+            _set_iw3sp_launch_option()
+
+        # ── Non-Steam shortcuts for MP modes ──────────────────────────────────
         try:
             from shortcut import create_shortcuts
             self._s.log.emit("Creating non-Steam shortcuts...")
@@ -822,6 +838,11 @@ class InstallScreen(QWidget):
             self._s.log.emit(f"  Shortcuts skipped: {ex}")
 
         cfg.complete_first_run(self.steam_root)
+
+        # ── Re-apply launch options one final time to ensure Steam didn't overwrite them ──
+        _set_iw4x_launch_option()
+        _set_iw3sp_launch_option()
+
         self._s.progress.emit(100, "All done!")
         self._s.done.emit(True)
 
