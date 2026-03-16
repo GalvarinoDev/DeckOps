@@ -102,7 +102,7 @@ def install_iw3sp(game: dict, steam_root: str,
     prog(80, "Setting Steam launch option...")
     try:
         from wrapper import set_launch_options
-        set_launch_options(steam_root, "7940", "iw3sp_mod.exe %command%")
+        set_launch_options(steam_root, "7940", "bash -c 'exec \"${@/iw3sp.exe/iw3sp_mod.exe}\"' -- %command%")
         prog(90, "Launch option set.")
     except Exception as ex:
         prog(90, f"Warning: could not set launch option: {ex}")
