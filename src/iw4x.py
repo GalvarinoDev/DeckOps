@@ -164,17 +164,18 @@ def install_iw4x(game: dict, steam_root: str,
     if errors:
         raise RuntimeError("iwd download failed:\n" + "\n".join(errors))
 
-    # Write launch option via dedicated shell script while Steam is closed
+    # Write launch option by opening a terminal that runs the exact command
+    # confirmed to work manually. Terminal closes automatically when done.
     prog(92, "Setting Steam launch option...")
     script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "set_launch_iw4x.sh")
     try:
-        result = subprocess.run(["bash", script], capture_output=True, text=True)
-        if result.returncode == 0:
-            prog(92, "Launch option set.")
-        else:
-            prog(92, f"Warning: script exited {result.returncode}: {result.stderr.strip()}")
+        subprocess.run([
+            "konsole", "--hide-menubar", "--hide-tabbar",
+            "--title", "DeckOps - Applying launch option...",
+            "-e", "bash", script
+        ], check=True)
     except Exception as ex:
-        prog(92, f"Warning: could not run script: {ex}")
+        prog(92, f"Warning: could not set launch option: {ex}")
 
     prog(100, "IW4x installation complete!")
 

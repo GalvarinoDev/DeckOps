@@ -105,17 +105,18 @@ def install_iw3sp(game: dict, steam_root: str,
     with open(meta_path, "w") as f:
         json.dump({"version": "4.1.5"}, f, indent=2)
 
-    # Write launch option via dedicated shell script while Steam is closed
+    # Write launch option by opening a terminal that runs the exact command
+    # confirmed to work manually. Terminal closes automatically when done.
     prog(90, "Setting Steam launch option...")
     script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "set_launch_iw3sp.sh")
     try:
-        result = subprocess.run(["bash", script], capture_output=True, text=True)
-        if result.returncode == 0:
-            prog(90, "Launch option set.")
-        else:
-            prog(90, f"Warning: script exited {result.returncode}: {result.stderr.strip()}")
+        subprocess.run([
+            "konsole", "--hide-menubar", "--hide-tabbar",
+            "--title", "DeckOps - Applying launch option...",
+            "-e", "bash", script
+        ], check=True)
     except Exception as ex:
-        prog(90, f"Warning: could not run script: {ex}")
+        prog(90, f"Warning: could not set launch option: {ex}")
 
     prog(100, "IW3SP-MOD installation complete!")
 
