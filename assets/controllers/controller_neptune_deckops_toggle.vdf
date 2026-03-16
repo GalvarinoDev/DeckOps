@@ -494,6 +494,35 @@
 			"gyro_button_invert"		"2"
 		}
 	}
+	"group"
+	{
+		"id"		"15"
+		"mode"		"joystick_move"
+		"inputs"
+		{
+			"click"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"xinput_button JOYSTICK_RIGHT"
+						}
+						"settings"
+						{
+							"haptic_intensity"		"1"
+						}
+					}
+				}
+			}
+		}
+		"settings"
+		{
+			"sensitivity"		"523"
+		}
+	}
 	"preset"
 	{
 		"id"		"0"
@@ -513,6 +542,7 @@
 			"5"		"right_trigger active"
 			"9"		"dpad active"
 			"14"		"gyro active"
+			"15"		"right_joystick active"
 		}
 	}
 	"settings"
