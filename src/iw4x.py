@@ -92,37 +92,46 @@ def install_iw4x(game: dict, steam_root: str,
         if on_progress:
             on_progress(pct, msg)
 
-    # iw4x.dll
-    prog(5, "Downloading iw4x.dll...")
-    _download(f"{BASE_URL}/iw4x.dll",
-              os.path.join(install_dir, "iw4x.dll"),
-              lambda p, m: prog(5 + int(p * 0.15), m),
-              "Downloading iw4x.dll...")
+    # Download iw4x.dll, iw4x.exe and release.zip in parallel — they're independent
+    prog(5, "Downloading iw4x files...")
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
 
-    # iw4x.exe
-    prog(20, "Downloading iw4x.exe...")
-    _download(f"{RAW_URL}/iw4x.exe",
-              os.path.join(install_dir, "iw4x.exe"),
-              lambda p, m: prog(20 + int(p * 0.15), m),
-              "Downloading iw4x.exe...")
+    dl_tasks = [
+        (f"{BASE_URL}/iw4x.dll",   os.path.join(install_dir, "iw4x.dll"),  "iw4x.dll"),
+        (f"{RAW_URL}/iw4x.exe",    os.path.join(install_dir, "iw4x.exe"),   "iw4x.exe"),
+        (f"{RAW_URL}/release.zip", os.path.join(install_dir, "release.zip"), "release.zip"),
+    ]
+    dl_errors = []
+    dl_lock   = threading.Lock()
+    dl_done   = [0]
 
-    # release.zip — extract then delete
-    prog(35, "Downloading rawfiles...")
+    def _dl(url, dest, label):
+        _download(url, dest, None, f"Downloading {label}...")
+        with dl_lock:
+            dl_done[0] += 1
+            prog(5 + int(dl_done[0] / len(dl_tasks) * 50), f"Downloaded {label}")
+
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        futs = {ex.submit(_dl, url, dest, label): label for url, dest, label in dl_tasks}
+        for fut in _as_completed(futs):
+            try:
+                fut.result()
+            except Exception as e:
+                dl_errors.append(f"{futs[fut]}: {e}")
+
+    if dl_errors:
+        raise RuntimeError("Download failed:\n" + "\n".join(dl_errors))
+
+    # Extract release.zip
+    prog(58, "Extracting rawfiles...")
     zip_dest = os.path.join(install_dir, "release.zip")
-    _download(f"{RAW_URL}/release.zip",
-              zip_dest,
-              lambda p, m: prog(35 + int(p * 0.25), m),
-              "Downloading release.zip...")
-    prog(60, "Extracting rawfiles...")
     with zipfile.ZipFile(zip_dest) as zf:
         zf.extractall(install_dir)
     os.remove(zip_dest)
 
     # iwd files → iw4x/ subfolder — downloaded in parallel
-    prog(65, "Downloading iwd files...")
-    import threading
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-
+    prog(62, "Downloading iwd files...")
     errors = []
     completed = 0
     total_iwds = len(IWD_FILES)
@@ -130,20 +139,22 @@ def install_iw4x(game: dict, steam_root: str,
 
     def _download_iwd(iwd):
         nonlocal completed
-        _download(
-            f"{RAW_URL}/{iwd}",
-            os.path.join(iw4x_dir, iwd),
-            None,
-            f"Downloading {iwd}...",
-        )
+        dest = os.path.join(iw4x_dir, iwd)
+        if not os.path.exists(dest):
+            _download(
+                f"{RAW_URL}/{iwd}",
+                dest,
+                None,
+                f"Downloading {iwd}...",
+            )
         with lock:
             completed += 1
-            pct = 65 + int(completed / total_iwds * 25)
+            pct = 62 + int(completed / total_iwds * 25)
             prog(pct, f"Downloaded {completed}/{total_iwds} iwd files...")
 
     with ThreadPoolExecutor(max_workers=6) as executor:
         futures = {executor.submit(_download_iwd, iwd): iwd for iwd in IWD_FILES}
-        for future in as_completed(futures):
+        for future in _as_completed(futures):
             try:
                 future.result()
             except Exception as ex:
@@ -151,15 +162,6 @@ def install_iw4x(game: dict, steam_root: str,
 
     if errors:
         raise RuntimeError("iwd download failed:\n" + "\n".join(errors))
-
-    # Set Steam launch option so appid 10190 runs iw4x.exe directly
-    prog(92, "Setting Steam launch option...")
-    try:
-        from wrapper import set_launch_options
-        set_launch_options(steam_root, "10190", "bash -c 'exec \"${@/iw4mp.exe/iw4x.exe}\"' -- %command%")
-        prog(96, "Launch option set.")
-    except Exception as ex:
-        prog(96, f"Warning: could not set launch option: {ex}")
 
     prog(100, "IW4x installation complete!")
 
