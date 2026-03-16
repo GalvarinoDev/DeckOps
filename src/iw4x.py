@@ -156,7 +156,7 @@ def install_iw4x(game: dict, steam_root: str,
     prog(92, "Setting Steam launch option...")
     try:
         from wrapper import set_launch_options
-        set_launch_options(steam_root, "10190", "iw4x.exe %command%")
+        set_launch_options(steam_root, "10190", "bash -c 'exec \"${@/iw4mp.exe/iw4x.exe}\"' -- %command%")
         prog(96, "Launch option set.")
     except Exception as ex:
         prog(96, f"Warning: could not set launch option: {ex}")
