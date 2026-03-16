@@ -81,7 +81,7 @@ rm -rf "$TMPDIR_EXTRACT"
 chmod +x "$ENTRY_POINT" 2>/dev/null || true
 success "DeckOps installed to $INSTALL_DIR"
 
-# ── step 4: download background music ────────────────────────────────────────
+# ── step 4: download background music (background) ───────────────────────────
 info "Downloading background music..."
 
 mkdir -p "$MUSIC_DIR"
@@ -89,7 +89,8 @@ mkdir -p "$MUSIC_DIR"
 if [ ! -f "$MUSIC_DIR/$MUSIC_FILE" ]; then
     curl -sSL "$MUSIC_URL" -o "$MUSIC_DIR/$MUSIC_FILE" \
         && success "Background music downloaded." \
-        || warn "Could not download background music — app will run without it."
+        || warn "Could not download background music — app will run without it." &
+    MUSIC_PID=$!
 else
     success "Background music already present."
 fi
@@ -104,32 +105,14 @@ else
     success "Virtual environment already exists."
 fi
 
-if ! "$VENV_PYTHON" -c "from PyQt5.QtWidgets import QApplication" &>/dev/null 2>&1; then
-    info "Installing PyQt5 (this will take about 30 seconds)..."
-    "$VENV_DIR/bin/pip" install --quiet PyQt5 \
-        || die "Failed to install PyQt5. Check your internet connection and try again."
-    success "PyQt5 installed."
-else
-    PYQT5_VER=$("$VENV_PYTHON" -c "from PyQt5.QtCore import QT_VERSION_STR; print(QT_VERSION_STR)")
-    success "PyQt5 (Qt $PYQT5_VER) already installed."
-fi
+info "Installing Python packages..."
+"$VENV_DIR/bin/pip" install --quiet -r "$INSTALL_DIR/requirements.txt" \
+    || die "Failed to install Python packages. Check your internet connection and try again."
+success "Python packages installed."
 
-if ! "$VENV_PYTHON" -c "import pygame" &>/dev/null 2>&1; then
-    info "Installing pygame..."
-    "$VENV_DIR/bin/pip" install --quiet pygame \
-        || warn "Failed to install pygame — background music will not play."
-    success "pygame installed."
-else
-    success "pygame already installed."
-fi
-
-if ! "$VENV_PYTHON" -c "import vdf" &>/dev/null 2>&1; then
-    info "Installing vdf..."
-    "$VENV_DIR/bin/pip" install --quiet vdf \
-        || warn "Failed to install vdf — non-Steam shortcuts may not be created."
-    success "vdf installed."
-else
-    success "vdf already installed."
+# Wait for music download to finish if it was running
+if [ -n "${MUSIC_PID:-}" ]; then
+    wait "$MUSIC_PID" 2>/dev/null || true
 fi
 
 # ── step 6: .desktop entry ────────────────────────────────────────────────────
