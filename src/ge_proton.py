@@ -76,6 +76,32 @@ def _is_installed(version):
     return os.path.isdir(os.path.join(COMPAT_DIR, version))
 
 
+def _get_local_version() -> str | None:
+    """
+    Scan compatibilitytools.d for the newest installed GE-Proton version.
+    Returns the version string (e.g. 'GE-Proton10-32') or None if not found.
+    Works regardless of how GE-Proton was installed (ProtonUp-Qt, manual, etc.)
+    """
+    import re
+    if not os.path.isdir(COMPAT_DIR):
+        return None
+
+    def _version_key(name):
+        parts = re.findall(r'\d+', name)
+        return tuple(int(p) for p in parts)
+
+    candidates = [
+        d for d in os.listdir(COMPAT_DIR)
+        if d.startswith("GE-Proton") and
+        os.path.exists(os.path.join(COMPAT_DIR, d, "proton"))
+    ]
+    if not candidates:
+        return None
+
+    candidates.sort(key=_version_key, reverse=True)
+    return candidates[0]
+
+
 # ── Download helpers ──────────────────────────────────────────────────────────
 
 def _download(url, dest, on_progress=None):
@@ -128,9 +154,21 @@ def install_ge_proton(on_progress=None):
         if on_progress:
             on_progress(pct, msg)
 
+    # Check if a local GE-Proton install already exists before hitting GitHub.
+    # This handles both previous DeckOps installs and external tools like ProtonUp-Qt.
+    local_version = _get_local_version()
+    if local_version:
+        prog(5, f"Found local GE-Proton: {local_version}. Checking for updates...")
+    else:
+        prog(0, "Checking latest GE-Proton release...")
+
     prog(0, "Checking latest GE-Proton release...")
     version, tarball_url, checksum_url = _get_latest_release()
     prog(5, f"Latest: {version}")
+
+    if local_version == version:
+        prog(100, f"GE-Proton {version} already installed — skipping download.")
+        return version
 
     if _is_installed(version):
         prog(100, f"GE-Proton {version} already installed.")
