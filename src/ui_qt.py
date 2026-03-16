@@ -540,6 +540,7 @@ class InstallScreen(QWidget):
         from cod4x import install_cod4x
         from iw4x import install_iw4x
         from iw3sp import install_iw3sp
+        from controller_profiles import install_controller_templates
         from ge_proton import install_ge_proton, set_compat_tool, MANAGED_APPIDS
 
         selected_keys   = [key for key, _, _ in self.selected]
@@ -549,19 +550,6 @@ class InstallScreen(QWidget):
         logged_bases    = set()
         ge_version      = None
         _compat_applied = False
-        _steam_killed   = False
-
-        def _kill_steam_once():
-            nonlocal _steam_killed
-            if not _steam_killed:
-                self._s.progress.emit(28, "Closing Steam...")
-                self._s.log.emit("Closing Steam...")
-                try:
-                    kill_steam()
-                    self._s.log.emit("  ✓ Steam closed.")
-                except Exception as ex:
-                    self._s.log.emit(f"  Could not close Steam: {ex}")
-                _steam_killed = True
 
         def _apply_compat():
             nonlocal _compat_applied
@@ -573,6 +561,22 @@ class InstallScreen(QWidget):
                     _compat_applied = True
                 except Exception as ex:
                     self._s.log.emit(f"  CompatToolMapping skipped: {ex}")
+
+        _profiles_assigned = False
+        def _assign_profiles():
+            nonlocal _profiles_assigned
+            if not _profiles_assigned:
+                try:
+                    from controller_profiles import assign_controller_profiles
+                    gyro_mode = cfg.get_gyro_mode() or "hold"
+                    assign_controller_profiles(
+                        gyro_mode,
+                        on_progress=lambda msg: self._s.log.emit(f"  {msg}")
+                    )
+                    self._s.log.emit(f"✓  Controller profiles assigned ({gyro_mode} mode)")
+                    _profiles_assigned = True
+                except Exception as ex:
+                    self._s.log.emit(f"  Controller profile assignment skipped: {ex}")
 
         _launch_defaults_set = False
         def _set_launch_defaults():
@@ -594,7 +598,7 @@ class InstallScreen(QWidget):
             except Exception as ex:
                 self._s.log.emit(f"  Launch options skipped: {ex}")
 
-        # ── GE-Proton download + extract (Steam still running) ────────────────
+        # ── GE-Proton download + extract (Steam still running — no config.vdf write yet) ──
         try:
             self._s.progress.emit(2, "Installing GE-Proton...")
             self._s.log.emit("Installing GE-Proton...")
@@ -607,10 +611,51 @@ class InstallScreen(QWidget):
 
         proton = get_proton_path(self.steam_root)
 
-        # ── Plutonium bootstrapper (Steam still running) ──────────────────────
+        # ── iw4x ─────────────────────────────────────────────────────────────
+        if has_iw4x:
+            for key, gd, game in [(k, gd, g) for k, gd, g in self.selected if KEY_CLIENT.get(k) == "iw4x"]:
+                base_name = gd["base"]
+                self._s.progress.emit(12, f"Setting up {base_name}...")
+                def op_iw4x(pct, msg): self._s.progress.emit(12 + int(pct / 100 * 8), msg)
+                try:
+                    compat = find_compatdata(self.steam_root, gd["appid"])
+                    install_iw4x(game, self.steam_root, proton, compat, op_iw4x)
+                    cfg.mark_game_setup(key, "iw4x")
+                    self._s.log.emit(f"✓  {base_name} done")
+                    logged_bases.add(base_name)
+                except Exception as ex:
+                    self._s.log.emit(f"✗  {base_name} ({key}) failed: {ex}")
+
+        # ── Controller templates + initial profile assignment ─────────────────
+        # Write profiles now (Steam still running) AND again after kill_steam()
+        # to ensure they survive Steam's shutdown overwrite.
+        self._s.progress.emit(20, "Installing controller templates...")
+        self._s.log.emit("Installing controller templates...")
+        try:
+            from controller_profiles import install_controller_templates, assign_controller_profiles
+            install_controller_templates(
+                on_progress=lambda msg: self._s.log.emit(f"  {msg}")
+            )
+            gyro_mode = cfg.get_gyro_mode() or "hold"
+            assign_controller_profiles(
+                gyro_mode,
+                on_progress=lambda msg: self._s.log.emit(f"  {msg}")
+            )
+            self._s.log.emit(f"✓  Controller profiles assigned ({gyro_mode} mode)")
+        except Exception as ex:
+            self._s.log.emit(f"  Templates skipped: {ex}")
+
+        try:
+            from wrapper import set_steam_input_enabled
+            set_steam_input_enabled(self.steam_root)
+            self._s.log.emit("✓  Steam Input enabled for all games")
+        except Exception as ex:
+            self._s.log.emit(f"  Steam Input setup skipped: {ex}")
+
+        # ── Plutonium block ───────────────────────────────────────────────────
         if has_plut:
             if not is_plutonium_ready():
-                self._s.progress.emit(12, "Launching Plutonium — please log in...")
+                self._s.progress.emit(22, "Launching Plutonium — please log in...")
                 self._s.log.emit(
                     "Plutonium is launching now.\n"
                     "  1. Wait for it to finish downloading\n"
@@ -637,7 +682,7 @@ class InstallScreen(QWidget):
 
                 self._s.log.emit("✓  Plutonium ready.")
             else:
-                self._s.progress.emit(12, "Close Plutonium if open, then confirm...")
+                self._s.progress.emit(22, "Close Plutonium if open, then confirm...")
                 self._s.log.emit(
                     "Almost there!\n"
                     "  Close Plutonium if it's still open.\n"
@@ -647,13 +692,17 @@ class InstallScreen(QWidget):
                 self._plut_event.wait()
                 self._s.plut_go.emit()
 
-        # ── Kill Steam — everything from here runs with Steam closed ──────────
-        _kill_steam_once()
-        _apply_compat()
-        _set_launch_defaults()
+            self._s.progress.emit(28, "Closing Steam...")
+            self._s.log.emit("Closing Steam...")
+            try:
+                kill_steam()
+                self._s.log.emit("  ✓ Steam closed.")
+            except Exception as ex:
+                self._s.log.emit(f"  Could not close Steam: {ex}")
+            _apply_compat()
+            _assign_profiles()
+            _set_launch_defaults()
 
-        # ── Plutonium games ───────────────────────────────────────────────────
-        if has_plut:
             plut_selected = [(k, gd, g) for k, gd, g in self.selected if KEY_CLIENT.get(k) == "plutonium"]
             total_plut = len(plut_selected)
             for idx, (key, gd, game) in enumerate(plut_selected):
@@ -672,23 +721,20 @@ class InstallScreen(QWidget):
                 except Exception as ex:
                     self._s.log.emit(f"✗  {base_name} ({key}) failed: {ex}")
 
-        # ── iw4x (Steam closed) ───────────────────────────────────────────────
-        if has_iw4x:
-            for key, gd, game in [(k, gd, g) for k, gd, g in self.selected if KEY_CLIENT.get(k) == "iw4x"]:
-                base_name = gd["base"]
-                self._s.progress.emit(62, f"Setting up {base_name}...")
-                def op_iw4x(pct, msg): self._s.progress.emit(62 + int(pct / 100 * 8), msg)
-                try:
-                    compat = find_compatdata(self.steam_root, gd["appid"])
-                    install_iw4x(game, self.steam_root, proton, compat, op_iw4x)
-                    cfg.mark_game_setup(key, "iw4x")
-                    self._s.log.emit(f"✓  {base_name} done")
-                    logged_bases.add(base_name)
-                except Exception as ex:
-                    self._s.log.emit(f"✗  {base_name} ({key}) failed: {ex}")
-
-        # ── CoD4 (iw3sp + cod4x) — Steam closed ──────────────────────────────
+        # ── CoD4 block ────────────────────────────────────────────────────────
         if has_cod4:
+            if not has_plut:
+                self._s.progress.emit(72, "Closing Steam...")
+                self._s.log.emit("Closing Steam...")
+                try:
+                    kill_steam()
+                    self._s.log.emit("  ✓ Steam closed.")
+                except Exception as ex:
+                    self._s.log.emit(f"  Could not close Steam: {ex}")
+                _apply_compat()
+                _assign_profiles()
+                _set_launch_defaults()
+
             cod4_selected = [(k, gd, g) for k, gd, g in self.selected if KEY_CLIENT.get(k) in ("cod4x", "iw3sp")]
             for key, gd, game in cod4_selected:
                 base_name = gd["base"]
@@ -734,31 +780,19 @@ class InstallScreen(QWidget):
         except Exception as ex:
             self._s.log.emit(f"  Game configs skipped: {ex}")
 
-        # ── Controller templates + profiles (after all games) ─────────────────
-        self._s.progress.emit(90, "Installing controller templates...")
-        self._s.log.emit("Installing controller templates...")
-        try:
-            from controller_profiles import install_controller_templates, assign_controller_profiles
-            install_controller_templates(
-                on_progress=lambda msg: self._s.log.emit(f"  {msg}")
-            )
-            gyro_mode = cfg.get_gyro_mode() or "hold"
-            assign_controller_profiles(
-                gyro_mode,
-                on_progress=lambda msg: self._s.log.emit(f"  {msg}")
-            )
-            self._s.log.emit(f"✓  Controller profiles assigned ({gyro_mode} mode)")
-        except Exception as ex:
-            self._s.log.emit(f"  Templates skipped: {ex}")
+        # ── iw4x-only fallback: kill Steam and apply compat tool ─────────────
+        if not has_plut and not has_cod4 and has_iw4x:
+            self._s.log.emit("Closing Steam to apply GE-Proton settings...")
+            try:
+                kill_steam()
+                self._s.log.emit("  ✓ Steam closed.")
+            except Exception as ex:
+                self._s.log.emit(f"  Could not close Steam: {ex}")
+            _apply_compat()
+            _assign_profiles()
+            _set_launch_defaults()
 
-        try:
-            from wrapper import set_steam_input_enabled
-            set_steam_input_enabled(self.steam_root)
-            self._s.log.emit("✓  Steam Input enabled for all games")
-        except Exception as ex:
-            self._s.log.emit(f"  Steam Input setup skipped: {ex}")
-
-        # ── Non-Steam shortcuts ───────────────────────────────────────────────
+        # ── Non-Steam shortcuts for MP modes ──────────────────────────────────
         try:
             from shortcut import create_shortcuts
             self._s.log.emit("Creating non-Steam shortcuts...")
@@ -1066,28 +1100,24 @@ class ControllerInfoScreen(QWidget):
         lay.addLayout(cw)
 
     def _launch_steam_and_continue(self):
-        # Write launch options one final time just before Steam starts,
-        # so Steam reads them fresh on startup rather than overwriting them.
-        try:
-            from wrapper import set_launch_options
-            import config as _cfg
-            steam_root = _cfg.load().get("steam_root", "") or find_steam_root()
-            if steam_root:
-                from detect_games import find_installed_games, parse_library_folders
-                installed = find_installed_games(parse_library_folders(steam_root))
-                if "iw4mp" in installed:
-                    set_launch_options(steam_root, "10190",
-                                       "bash -c 'exec \"${@/iw4mp.exe/iw4x.exe}\"' -- %command%")
-                if "cod4sp" in installed:
-                    set_launch_options(steam_root, "7940",
-                                       "bash -c 'exec \"${@/iw3sp.exe/iw3sp_mod.exe}\"' -- %command%")
-        except Exception:
-            pass
+        # Re-run launch option scripts immediately before Steam starts —
+        # this is the last possible moment to write before Steam reads the file.
+        src_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
+        import subprocess as _sp
+        for script in ["set_launch_iw3sp.sh", "set_launch_iw4x.sh"]:
+            path = os.path.join(src_dir, script)
+            if os.path.exists(path):
+                try:
+                    _sp.run(["xterm", "-title", "DeckOps - Applying launch option...",
+                             "-e", "bash", path], check=True)
+                except Exception:
+                    pass
         # Launch Steam in background
         try:
+            import subprocess
             subprocess.Popen(["steam"], start_new_session=True)
         except Exception:
-            pass  # Continue anyway if Steam fails to launch
+            pass
         self._go_management()
 
     def _go_management(self):
@@ -1372,12 +1402,13 @@ class UpdateScreen(QWidget):
         from plutonium import install_plutonium
 
         has_cod4 = any(KEY_CLIENT.get(k) in ("cod4x", "iw3sp") for k, _, _ in self.selected)
+        has_iw4x = any(KEY_CLIENT.get(k) == "iw4x" for k, _, _ in self.selected)
         proton   = get_proton_path(self.steam_root)
         total    = len(self.selected)
 
-        if has_cod4:
+        if has_cod4 or has_iw4x:
             self._s.log.emit(
-                "CoD4 requires Steam to be closed.\n"
+                "Steam must be closed to continue.\n"
                 "  1. Close Steam completely\n"
                 "  2. Click the button below to continue"
             )
