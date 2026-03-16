@@ -535,7 +535,7 @@ class InstallScreen(QWidget):
         self.stack.setCurrentIndex(5)
 
     def _run(self):
-        from wrapper import get_proton_path, find_compatdata, kill_steam, set_launch_options
+        from wrapper import get_proton_path, find_compatdata, kill_steam
         from plutonium import launch_bootstrapper, is_plutonium_ready, install_plutonium
         from cod4x import install_cod4x
         from iw4x import install_iw4x
@@ -684,10 +684,6 @@ class InstallScreen(QWidget):
                     cfg.mark_game_setup(key, "iw4x")
                     self._s.log.emit(f"✓  {base_name} done")
                     logged_bases.add(base_name)
-                    # Write launch option immediately after install while Steam is closed
-                    set_launch_options(self.steam_root, "10190",
-                                       "bash -c 'exec \"${@/iw4mp.exe/iw4x.exe}\"' -- %command%")
-                    self._s.log.emit("✓  iw4x launch option set")
                 except Exception as ex:
                     self._s.log.emit(f"✗  {base_name} ({key}) failed: {ex}")
 
@@ -709,10 +705,6 @@ class InstallScreen(QWidget):
                         install_cod4x(game, self.steam_root, proton, compat, op_cod4)
                     elif c == "iw3sp":
                         install_iw3sp(game, self.steam_root, proton, compat, op_cod4)
-                        # Write launch option immediately after install while Steam is closed
-                        set_launch_options(self.steam_root, "7940",
-                                           "bash -c 'exec \"${@/iw3sp.exe/iw3sp_mod.exe}\"' -- %command%")
-                        self._s.log.emit("✓  iw3sp launch option set")
                     cfg.mark_game_setup(key, c)
                     if base_name not in logged_bases:
                         self._s.log.emit(f"✓  {base_name} done")

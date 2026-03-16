@@ -10,7 +10,9 @@ Progress is reported via a callback:
 """
 
 import os
+import sys
 import zipfile
+import subprocess
 import urllib.request
 
 BASE_URL = "https://github.com/iw4x/iw4x-client/releases/latest/download"
@@ -162,6 +164,22 @@ def install_iw4x(game: dict, steam_root: str,
 
     if errors:
         raise RuntimeError("iwd download failed:\n" + "\n".join(errors))
+
+    # Write launch option via a separate process so it is isolated from
+    # the Qt process and cannot be overwritten by anything still in memory.
+    prog(92, "Setting Steam launch option...")
+    src_dir = os.path.dirname(os.path.abspath(__file__))
+    try:
+        subprocess.run(
+            [sys.executable, "-c",
+             f"import sys; sys.path.insert(0, {repr(src_dir)}); "
+             f"from wrapper import set_launch_options; "
+             f"set_launch_options({repr(steam_root)}, '10190', "
+             f"\"bash -c 'exec \\\"${{@/iw4mp.exe/iw4x.exe}}\\\"' -- %command%\")"],
+            capture_output=True,
+        )
+    except Exception as ex:
+        prog(92, f"Warning: could not set launch option: {ex}")
 
     prog(100, "IW4x installation complete!")
 
