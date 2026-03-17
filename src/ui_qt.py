@@ -1096,7 +1096,7 @@ class ControllerInfoScreen(QWidget):
 
         lay.addStretch()
 
-        cont = _btn("Launch Steam & Continue  >>", C_IW, h=52)
+        cont = _btn("Continue  >>", C_IW, h=52)
         cont.clicked.connect(self._launch_steam_and_continue)
         cw = QHBoxLayout(); cw.addStretch(); cw.addWidget(cont, stretch=1); cw.addStretch()
         lay.addLayout(cw)
