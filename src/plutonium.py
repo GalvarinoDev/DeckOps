@@ -164,18 +164,76 @@ def launch_bootstrapper(proton_path: str, on_progress=None):
 
 # ── copy to game prefix ───────────────────────────────────────────────────────
 
+# Maps appid -> storage subfolder name
+_APPID_STORAGE_DIR = {
+    10090:  "t4",
+    42700:  "t5",
+    42710:  "t5",
+    202990: "t6",
+    212910: "t6",
+    42690:  "iw5",
+}
+
+
 def _copy_plut_to_prefix(src_plut_dir: str, dest_plut_dir: str,
-                          on_progress=None):
-    """Copy the entire Plutonium/ folder from src to dest."""
+                          appid: int, on_progress=None):
+    """
+    Selectively copy only the files this game needs from the Plutonium
+    directory into the game's prefix, rather than copying everything.
+
+    Always copies:
+      - bin/           — launcher executable, required by all games
+      - config.json    — credentials
+      - info.json      — client info
+
+    Copies only the relevant storage subfolder for this appid:
+      - storage/t4/    — WaW (appid 10090)
+      - storage/t5/    — BO1 (appid 42700 / 42710)
+      - storage/t6/    — BO2 (appid 202990 / 212910)
+      - storage/iw5/   — MW3 (appid 42690)
+
+    This avoids copying unrelated game data and saves disk space.
+    """
     def prog(msg):
         if on_progress:
             on_progress(msg)
 
-    if os.path.exists(dest_plut_dir):
-        shutil.rmtree(dest_plut_dir)
+    os.makedirs(dest_plut_dir, exist_ok=True)
 
-    shutil.copytree(src_plut_dir, dest_plut_dir)
-    prog(f"Copied Plutonium to {dest_plut_dir}")
+    # Always copy bin/
+    src_bin  = os.path.join(src_plut_dir, "bin")
+    dest_bin = os.path.join(dest_plut_dir, "bin")
+    if os.path.isdir(src_bin):
+        if os.path.exists(dest_bin):
+            shutil.rmtree(dest_bin)
+        shutil.copytree(src_bin, dest_bin)
+        prog("  Copied bin/")
+
+    # Always copy config.json and info.json
+    for fname in ("config.json", "info.json"):
+        src_f  = os.path.join(src_plut_dir, fname)
+        dest_f = os.path.join(dest_plut_dir, fname)
+        if os.path.exists(src_f):
+            shutil.copy2(src_f, dest_f)
+            prog(f"  Copied {fname}")
+
+    # Copy only the relevant storage subfolder
+    storage_subdir = _APPID_STORAGE_DIR.get(appid)
+    if storage_subdir:
+        src_storage  = os.path.join(src_plut_dir, "storage", storage_subdir)
+        dest_storage = os.path.join(dest_plut_dir, "storage", storage_subdir)
+        if os.path.isdir(src_storage):
+            os.makedirs(os.path.join(dest_plut_dir, "storage"), exist_ok=True)
+            if os.path.exists(dest_storage):
+                shutil.rmtree(dest_storage)
+            shutil.copytree(src_storage, dest_storage)
+            prog(f"  Copied storage/{storage_subdir}/")
+        else:
+            prog(f"  storage/{storage_subdir}/ not found in source — skipping")
+    else:
+        prog(f"  No storage mapping for appid {appid} — skipping storage copy")
+
+    prog(f"Plutonium files copied to {dest_plut_dir}")
 
 
 # ── xact ──────────────────────────────────────────────────────────────────────
@@ -366,6 +424,7 @@ def install_plutonium(game: dict, game_key: str, steam_root: str,
     prog(10, f"Copying Plutonium into prefix for {game['name']}...")
     _copy_plut_to_prefix(
         src_plut_dir, dest_plut_dir,
+        appid=GAME_META[game_key][0],
         on_progress=lambda msg: prog(40, msg),
     )
 
