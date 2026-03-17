@@ -131,7 +131,7 @@ DeckOps is an installer. The projects below are what actually make it work.
 
 **[IW3SP-MOD](https://gitea.com/JerryALT/iw3sp_mod)** - CoD4 Campaign mod by JerryALT.
 
-Steam artwork from [SteamGridDB](https://www.steamgriddb.com) - thanks to Moohoo, jarvis, Ramjez, Over, Uravity-PRO, and Maxine.
+Steam artwork from [SteamGridDB](https://www.steamgriddb.com) - thanks to [Moohoo](https://www.steamgriddb.com/profile/76561198009314736), [jarvis](https://www.steamgriddb.com/profile/76561198103947979), [Ramjez](https://www.steamgriddb.com/profile/76561198122547176), [Over](https://www.steamgriddb.com/profile/76561198049670875), [Uravity-PRO](https://www.steamgriddb.com/profile/76561198167607660), and [Maxine](https://www.steamgriddb.com/profile/76561198130550992).
 
 **[Claude](https://claude.ai)** by Anthropic - assisted in development.
 
