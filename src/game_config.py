@@ -6,9 +6,9 @@ into the correct destination paths for each game. Overwrites whatever is
 currently there.
 
 LCD users only receive MW1 and MW2 configs.
-OLED users receive MW1, MW2, WaW, and BO1 configs.
+OLED users receive MW1, MW2, WaW, BO1, and MW3 configs.
 
-MW3 and BO2 configs are not yet available and are skipped silently.
+BO2 configs are not yet available and are skipped silently.
 """
 
 import os
@@ -49,7 +49,7 @@ def _pfx_local(steam_root, appid, *parts):
 # Keys that are absent for a given model are simply not included.
 
 _LCD_KEYS  = {"cod4sp", "cod4mp", "iw4sp", "iw4mp"}
-_OLED_KEYS = {"cod4sp", "cod4mp", "iw4sp", "iw4mp", "t4sp", "t4mp", "t5sp", "t5mp"}
+_OLED_KEYS = {"cod4sp", "cod4mp", "iw4sp", "iw4mp", "t4sp", "t4mp", "t5sp", "t5mp", "iw5sp", "iw5mp"}
 
 
 def _build_config_map(steam_root):
@@ -133,6 +133,25 @@ def _build_config_map(steam_root):
                 ),
             ),
         ],
+
+        # ── MW3 SP (via Steam, appid 42690) ───────────────────────────────────
+        # Config lands in players2/ inside the game install dir.
+        # Resolved at call time via install_dir — see apply_game_configs().
+        "iw5sp": [
+            ("MW3/config.cfg", None),
+        ],
+
+        # ── MW3 MP (Plutonium iw5, appid 42690) ───────────────────────────────
+        # Lives inside the Plutonium storage path for iw5.
+        "iw5mp": [
+            (
+                "MW3/config_mp.cfg",
+                _pfx_local(
+                    steam_root, 42690,
+                    "Plutonium", "storage", "iw5", "players"
+                ),
+            ),
+        ],
     }
 
 
@@ -148,6 +167,8 @@ def _dest_from_install(game_key, install_dir):
         return os.path.join(install_dir, "players", "profiles", "Player")
     if game_key in ("iw4sp", "iw4mp"):
         return os.path.join(install_dir, "players")
+    if game_key == "iw5sp":
+        return os.path.join(install_dir, "players2")
     return None
 
 
