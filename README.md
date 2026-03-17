@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  Bringing the golden age of FPS to your Steam Deck, no terminal required.
+  Bringing the Golden Age of FPS to your Steam Deck, no terminal required.
 </p>
 
 ---
