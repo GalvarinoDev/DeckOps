@@ -78,14 +78,6 @@ def _plut_dir_in_compatdata(steam_root: str, appid: int) -> str:
     )
 
 
-def _plut_launcher_in_compatdata(steam_root: str, appid: int) -> str:
-    """Return the path to plutonium-launcher-win32.exe inside a compatdata prefix."""
-    return os.path.join(
-        _plut_dir_in_compatdata(steam_root, appid),
-        "bin", "plutonium-launcher-win32.exe",
-    )
-
-
 def _wine_path(linux_path: str) -> str:
     """Convert a Linux path to Wine Z: drive notation."""
     return "Z:" + linux_path.replace("/", "\\")
@@ -283,12 +275,15 @@ def _write_config(plut_dir: str, game_keys: list, installed_games: dict):
 
 def _set_launch_option(steam_root: str, game_key: str, on_progress=None):
     """
-    Set a Steam launch option on the game's appid that redirects the original
-    exe to plutonium-launcher-win32.exe with the correct protocol URL.
+    Set a Steam launch option on the game's appid that launches
+    plutonium-launcher-win32.exe directly with the correct protocol URL.
 
-    Uses the same bash substitution pattern as iw3sp and iw4x so the original
-    exe is never touched. WaW (appid 10090) defaults to SP (t4sp) since MP
-    is handled by the non-Steam shortcut.
+    Steam provides Proton via CompatToolMapping so we don't invoke it
+    manually — we set STEAM_COMPAT_DATA_PATH and pass the protocol URL
+    as an argument after %command%.
+
+    WaW (appid 10090) defaults to SP (t4sp) since MP is handled by
+    the non-Steam shortcut.
 
     Must be called while Steam is closed.
     """
@@ -298,23 +293,20 @@ def _set_launch_option(steam_root: str, game_key: str, on_progress=None):
 
     from wrapper import set_launch_options
 
-    appid, _, exe_name = GAME_META[game_key]
+    appid, _, _ = GAME_META[game_key]
 
     # WaW SP and MP share appid 10090 — always write the SP launch option
     # so the Steam play button defaults to Singleplayer/Campaign.
-    if appid == 10090:
-        effective_key = WAW_DEFAULT_KEY
-        _, _, exe_name = GAME_META[effective_key]
-    else:
-        effective_key = game_key
+    effective_key = WAW_DEFAULT_KEY if appid == 10090 else game_key
 
-    launcher = _plut_launcher_in_compatdata(steam_root, appid)
+    compatdata_path = os.path.join(
+        steam_root, "steamapps", "compatdata", str(appid)
+    )
     plut_url = f"plutonium://play/{effective_key}"
 
-    # Redirect the original exe to the Plutonium launcher via bash substitution.
-    # The original exe is never modified.
     launch_option = (
-        f"bash -c 'exec \"${{@/{exe_name}/{launcher}}}\" \"{plut_url}\"' -- %command%"
+        f"STEAM_COMPAT_DATA_PATH=\"{compatdata_path}\" "
+        f"%command% \"{plut_url}\""
     )
 
     try:
