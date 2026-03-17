@@ -934,7 +934,7 @@ class ManagementScreen(QWidget):
         title = QLabel("DECKOPS"); title.setFont(font(22, display=True))
         title.setStyleSheet("color:#FFF;background:transparent;")
         hl.addWidget(title); hl.addStretch()
-        guide_btn = _btn("📋  Guide", C_BLUE_BTN, size=11, h=36); guide_btn.setFixedWidth(100)
+        guide_btn = _btn("📋  Setup Guide", C_BLUE_BTN, size=11, h=36); guide_btn.setFixedWidth(140)
         guide_btn.clicked.connect(lambda: self.stack.setCurrentIndex(7))
         hl.addWidget(guide_btn)
         hl.addSpacing(8)
@@ -1057,23 +1057,8 @@ class ControllerInfoScreen(QWidget):
         self._gyro_lbl = _lbl("", 12, C_DIM, align=Qt.AlignLeft)
         lay.addWidget(self._gyro_lbl)
 
-        # Exceptions note
-        exceptions_frame = QFrame()
-        exceptions_frame.setStyleSheet(f"QFrame{{background:{C_CARD};border-radius:6px;}}")
-        el = QVBoxLayout(exceptions_frame); el.setContentsMargins(12,10,12,10); el.setSpacing(6)
-        el.addWidget(_lbl("Exceptions — these use the Other template (keyboard-based layout):", 11, "#AAA", align=Qt.AlignLeft))
-        for game in ["MW1 Multiplayer (CoD4x)", "MW2 Singleplayer", "MW3 Singleplayer"]:
-            row = QHBoxLayout(); row.setContentsMargins(8,0,0,0); row.setSpacing(8)
-            dot = _lbl("•", 11, C_DIM, wrap=False); dot.setFixedWidth(12)
-            name = _lbl(game, 11, "#888", align=Qt.AlignLeft)
-            row.addWidget(dot); row.addWidget(name, stretch=1)
-            w = QWidget(); w.setLayout(row)
-            el.addWidget(w)
-        lay.addWidget(exceptions_frame)
-
         lay.addWidget(_lbl(
-            "Switch profiles anytime: Steam → Controller Settings → Default Layouts.\n"
-            "Change Hold ↔ Toggle in Settings → Re-apply Controller Profiles.",
+            "Change Hold / Toggle anytime in Settings -> Re-apply Controller Profiles.",
             11, "#666", align=Qt.AlignLeft))
 
         lay.addWidget(_hdiv())
@@ -1082,16 +1067,6 @@ class ControllerInfoScreen(QWidget):
         lay.addWidget(_lbl("✓  GE-Proton", 13, C_IW, bold=True, align=Qt.AlignLeft))
         lay.addWidget(_lbl(
             "Newest GE-Proton installed and set for all games.",
-            12, C_DIM, align=Qt.AlignLeft))
-
-        lay.addWidget(_hdiv())
-
-        # ── MW1 / WaW launch mode instruction ─────────────────────────────────
-        lay.addWidget(_lbl("⚠  First Launch - Modern Warfare 1 & World at War", 13, C_TREY, bold=True, align=Qt.AlignLeft))
-        lay.addWidget(_lbl(
-            "When launching either game for the first time, Steam will ask which mode you want to launch. "
-            "Select Singleplayer or Campaign and set it as your default. "
-            "Multiplayer for these games launches via the DeckOps shortcuts in your library instead.",
             12, C_DIM, align=Qt.AlignLeft))
 
         lay.addStretch()
@@ -1163,7 +1138,7 @@ class ConfigureScreen(QWidget):
         lay.addWidget(_lbl("Controller Profiles", 14, "#CCC", align=Qt.AlignLeft))
         cr = QHBoxLayout(); cr.setSpacing(12)
         ctrl_btn  = _btn("Re-apply Templates", C_DARK_BTN, size=12, h=40)
-        guide_btn = _btn("Guide", C_BLUE_BTN, size=12, h=40)
+        guide_btn = _btn("Setup Guide", C_BLUE_BTN, size=12, h=40)
         ctrl_btn.clicked.connect(self._apply_controller_profiles)
         guide_btn.clicked.connect(lambda: self.stack.setCurrentIndex(7))
         cr.addWidget(ctrl_btn); cr.addWidget(guide_btn); cr.addStretch()
