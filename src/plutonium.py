@@ -11,15 +11,15 @@ Flow:
   5. Copy the entire Plutonium/ folder into each selected game's prefix.
   6. If the game requires XACT (t4/t5 titles), install it into that prefix.
   7. Write config.json in each prefix with the correct game install paths.
-  8. Set a Steam launch option on the game's appid that redirects the original
-     exe to plutonium-launcher-win32.exe with the correct protocol URL.
-     No exe replacement or backup needed — the original exe is untouched.
+  8. Write a bash wrapper script that replaces the game exe, padded to the
+     original exe size so Steam's file validation does not flag it.
 
 Progress is reported via a callback:
     on_progress(percent: int, status: str)
 """
 
 import os
+import stat
 import shutil
 import json
 import subprocess
@@ -31,12 +31,12 @@ import urllib.request
 # This avoids depending on Steam to create a non-Steam game entry and gives
 # us a known, stable path to copy from.
 
-DEDICATED_PREFIX      = os.path.expanduser("~/.local/share/deckops/plutonium_prefix")
+DEDICATED_PREFIX = os.path.expanduser("~/.local/share/deckops/plutonium_prefix")
 PLUT_BOOTSTRAPPER_URL = "https://cdn.plutonium.pw/updater/plutonium.exe"
 
 
 # ── game metadata ─────────────────────────────────────────────────────────────
-# Maps DeckOps game key -> (appid, config.json path key, original exe name)
+# Maps DeckOps game key → (appid, config.json path key, exe name to replace)
 
 GAME_META = {
     "t4sp":  (10090,  "t4Path",  "CoDWaW.exe"),
@@ -53,10 +53,6 @@ METADATA_FILE = "deckops_plutonium.json"
 # Games that require XACT for audio to work correctly under Proton.
 # Matches the xact=True flags in detect_games.py.
 XACT_GAME_KEYS = {"t4sp", "t4mp", "t5sp", "t5mp"}
-
-# WaW shares appid 10090 for SP and MP. We default to SP (t4sp) since
-# MP is handled by the non-Steam shortcut.
-WAW_DEFAULT_KEY = "t4sp"
 
 
 # ── path helpers ──────────────────────────────────────────────────────────────
@@ -127,6 +123,8 @@ def launch_bootstrapper(proton_path: str, on_progress=None):
 
     plut_dir = get_dedicated_plut_dir()
     os.makedirs(plut_dir, exist_ok=True)
+
+    # Proton needs pfx/ to exist — initialise a minimal prefix structure
     os.makedirs(DEDICATED_PREFIX, exist_ok=True)
 
     bootstrapper = os.path.join(plut_dir, "plutonium.exe")
@@ -147,7 +145,6 @@ def launch_bootstrapper(proton_path: str, on_progress=None):
             if attempt == 2:
                 raise
             time.sleep(2 ** attempt)
-
     prog(15, "Launching Plutonium — please log in, then close the window when done.")
 
     env = os.environ.copy()
@@ -211,7 +208,7 @@ def _install_xact(compatdata_path: str, proton_path: str,
             on_progress(msg)
 
     if _is_xact_installed(compatdata_path):
-        prog("XACT already installed - skipping.")
+        prog("XACT already installed — skipping.")
         return True
 
     prog("Installing XACT (required for game audio)...")
@@ -231,13 +228,13 @@ def _install_xact(compatdata_path: str, proton_path: str,
             prog("XACT installed successfully.")
             return True
         else:
-            prog("XACT install finished with warnings - audio may still work.")
+            prog("XACT install finished with warnings — audio may still work.")
             return False
     except FileNotFoundError:
-        prog("winetricks not found - skipping XACT. Install with: sudo pacman -S winetricks")
+        prog("winetricks not found — skipping XACT. Install with: sudo pacman -S winetricks")
         return False
     except subprocess.TimeoutExpired:
-        prog("XACT install timed out - skipping.")
+        prog("XACT install timed out — skipping.")
         return False
 
 
@@ -247,22 +244,24 @@ def _write_config(plut_dir: str, game_keys: list, installed_games: dict):
     """
     Write config.json inside a prefix with the correct game install paths.
     Reads the existing config from the dedicated prefix and updates path keys.
-    game_keys       — list of game keys being installed into this prefix
+    game_keys   — list of game keys being installed into this prefix
     installed_games — dict from detect_games.find_installed_games()
     """
     config_path = os.path.join(plut_dir, "config.json")
 
+    # Read existing config (token etc.) from this prefix if present
     if os.path.exists(config_path):
         with open(config_path) as f:
             data = json.load(f)
     else:
         data = {}
 
+    # Write the path key for each game in this prefix
     for key in game_keys:
         if key not in GAME_META:
             continue
         _, path_key, _ = GAME_META[key]
-        game        = installed_games.get(key, {})
+        game = installed_games.get(key, {})
         install_dir = game.get("install_dir", "")
         if install_dir:
             data[path_key] = _wine_path(install_dir)
@@ -271,49 +270,49 @@ def _write_config(plut_dir: str, game_keys: list, installed_games: dict):
         json.dump(data, f, indent=2)
 
 
-# ── launch options ────────────────────────────────────────────────────────────
+# ── wrapper script ────────────────────────────────────────────────────────────
 
-def _set_launch_option(steam_root: str, game_key: str, on_progress=None):
+def _write_wrapper(game: dict, game_key: str, steam_root: str,
+                   proton_path: str, compatdata_path: str, plut_dir: str):
     """
-    Set a Steam launch option on the game's appid that launches
-    plutonium-launcher-win32.exe directly with the correct protocol URL.
+    Replace the game exe with a bash wrapper that launches
+    plutonium-launcher-win32.exe through Proton using the correct protocol.
 
-    Steam provides Proton via CompatToolMapping so we don't invoke it
-    manually — we set STEAM_COMPAT_DATA_PATH and pass the protocol URL
-    as an argument after %command%.
-
-    WaW (appid 10090) defaults to SP (t4sp) since MP is handled by
-    the non-Steam shortcut.
-
-    Must be called while Steam is closed.
+    The original exe is backed up as <exe>.bak.
+    The wrapper is padded to the original file's size so Steam's
+    file validation does not flag it as changed.
     """
-    def prog(msg):
-        if on_progress:
-            on_progress(msg)
+    install_dir    = game["install_dir"]
+    _, _, exe_name = GAME_META[game_key]
+    exe_path       = os.path.join(install_dir, exe_name)
+    backup_path    = exe_path + ".bak"
+    launcher       = os.path.join(plut_dir, "bin", "plutonium-launcher-win32.exe")
+    plut_url       = f"plutonium://play/{game_key}"
 
-    from wrapper import set_launch_options
+    # Read original size before we overwrite
+    original_size = os.path.getsize(exe_path) if os.path.exists(exe_path) else 0
 
-    appid, _, _ = GAME_META[game_key]
+    # Back up original exe
+    if not os.path.exists(backup_path) and os.path.exists(exe_path):
+        shutil.copy2(exe_path, backup_path)
+        original_size = os.path.getsize(backup_path)
 
-    # WaW SP and MP share appid 10090 — always write the SP launch option
-    # so the Steam play button defaults to Singleplayer/Campaign.
-    effective_key = WAW_DEFAULT_KEY if appid == 10090 else game_key
-
-    compatdata_path = os.path.join(
-        steam_root, "steamapps", "compatdata", str(appid)
-    )
-    plut_url = f"plutonium://play/{effective_key}"
-
-    launch_option = (
-        f"STEAM_COMPAT_DATA_PATH=\"{compatdata_path}\" "
-        f"%command% \"{plut_url}\""
+    script = (
+        "#!/bin/bash\n"
+        f"export STEAM_COMPAT_DATA_PATH=\"{compatdata_path}\"\n"
+        f"export STEAM_COMPAT_CLIENT_INSTALL_PATH=\"{steam_root}\"\n"
+        f"exec \"{proton_path}\" run \"{launcher}\" \"{plut_url}\"\n"
     )
 
-    try:
-        set_launch_options(steam_root, str(appid), launch_option)
-        prog(f"  + Launch option set for appid {appid} ({effective_key})")
-    except Exception as ex:
-        prog(f"  - Could not set launch option for {game_key}: {ex}")
+    script_bytes = script.encode("utf-8")
+    if original_size > len(script_bytes):
+        script_bytes += b"\x00" * (original_size - len(script_bytes))
+
+    with open(exe_path, "wb") as f:
+        f.write(script_bytes)
+
+    os.chmod(exe_path, os.stat(exe_path).st_mode |
+             stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
 
 # ── metadata ──────────────────────────────────────────────────────────────────
@@ -346,7 +345,7 @@ def install_plutonium(game: dict, game_key: str, steam_root: str,
     game            — entry from detect_games.find_installed_games()
     game_key        — one of: t4sp, t4mp, t5sp, t5mp, t6zm, t6mp, iw5mp
     steam_root      — path to Steam root
-    proton_path     — path to the proton executable (kept for XACT)
+    proton_path     — path to the proton executable
     compatdata_path — path to this game's compatdata prefix
     on_progress     — optional callback(percent: int, status: str)
     """
@@ -354,21 +353,24 @@ def install_plutonium(game: dict, game_key: str, steam_root: str,
         if on_progress:
             on_progress(pct, msg)
 
+    # Fall back to single-game dict if caller doesn't supply full installed_games.
+    # Supplying the full dict is preferred so sibling keys get correct paths.
     if installed_games is None:
         installed_games = {game_key: game}
 
+    src_plut_dir  = get_dedicated_plut_dir()
     dest_plut_dir = _plut_dir_in_compatdata(
         steam_root, GAME_META[game_key][0]
     )
 
     prog(10, f"Copying Plutonium into prefix for {game['name']}...")
     _copy_plut_to_prefix(
-        get_dedicated_plut_dir(), dest_plut_dir,
+        src_plut_dir, dest_plut_dir,
         on_progress=lambda msg: prog(40, msg),
     )
 
     # Install XACT into this game's prefix if required.
-    # Only runs for t4/t5 titles - skipped entirely for t6/iw5.
+    # Only runs for t4/t5 titles — skipped entirely for t6/iw5.
     if game_key in XACT_GAME_KEYS:
         prog(50, f"Installing XACT audio components for {game['name']}...")
         _install_xact(
@@ -377,20 +379,23 @@ def install_plutonium(game: dict, game_key: str, steam_root: str,
         )
 
     prog(60, "Writing game path to config.json...")
-    appid          = GAME_META[game_key][0]
+    # Pass all keys that share this appid so config has all paths for this prefix.
+    # installed_games must contain ALL installed games, not just the current one,
+    # so sibling keys (e.g. t4sp + t4mp share appid 10090) get their paths written too.
+    appid = GAME_META[game_key][0]
     keys_for_appid = [k for k, v in GAME_META.items() if v[0] == appid]
     _write_config(dest_plut_dir, keys_for_appid, installed_games)
 
-    prog(80, "Setting Steam launch option...")
-    _set_launch_option(
-        steam_root, game_key,
-        on_progress=lambda msg: prog(85, msg),
-    )
+    prog(80, "Writing launcher wrapper...")
+    _write_wrapper(game, game_key, steam_root, proton_path,
+                   compatdata_path, dest_plut_dir)
 
     prog(95, "Saving metadata...")
     _write_metadata(game["install_dir"], {
-        "game_key": game_key,
-        "plut_dir": dest_plut_dir,
+        "game_key":    game_key,
+        "plut_dir":    dest_plut_dir,
+        "wrapper_exe": os.path.join(game["install_dir"],
+                                    GAME_META[game_key][2]),
     })
 
     prog(100, f"Plutonium ready for {game['name']}!")
@@ -398,14 +403,22 @@ def install_plutonium(game: dict, game_key: str, steam_root: str,
 
 def uninstall_plutonium(game: dict, game_key: str):
     """
-    Remove the Plutonium folder from this game's prefix and clear metadata.
-    No exe restore needed — the original exe was never modified.
+    Restore the original game exe from backup and remove the
+    Plutonium folder from this game's prefix.
     """
-    meta     = _read_metadata(game["install_dir"])
+    install_dir    = game["install_dir"]
+    _, _, exe_name = GAME_META[game_key]
+    exe_path       = os.path.join(install_dir, exe_name)
+    backup_path    = exe_path + ".bak"
+
+    if os.path.exists(backup_path):
+        shutil.move(backup_path, exe_path)
+
+    meta     = _read_metadata(install_dir)
     plut_dir = meta.get("plut_dir", "")
     if plut_dir and os.path.isdir(plut_dir):
         shutil.rmtree(plut_dir)
 
-    meta_file = os.path.join(game["install_dir"], METADATA_FILE)
+    meta_file = os.path.join(install_dir, METADATA_FILE)
     if os.path.exists(meta_file):
         os.remove(meta_file)
