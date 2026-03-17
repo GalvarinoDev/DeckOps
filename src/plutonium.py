@@ -335,7 +335,7 @@ def _read_metadata(install_dir: str) -> dict:
 
 def install_plutonium(game: dict, game_key: str, steam_root: str,
                       proton_path: str, compatdata_path: str,
-                      on_progress=None):
+                      on_progress=None, installed_games: dict = None):
     """
     Full install flow for a single Plutonium game.
 
@@ -352,6 +352,11 @@ def install_plutonium(game: dict, game_key: str, steam_root: str,
     def prog(pct, msg):
         if on_progress:
             on_progress(pct, msg)
+
+    # Fall back to single-game dict if caller doesn't supply full installed_games.
+    # Supplying the full dict is preferred so sibling keys get correct paths.
+    if installed_games is None:
+        installed_games = {game_key: game}
 
     src_plut_dir  = get_dedicated_plut_dir()
     dest_plut_dir = _plut_dir_in_compatdata(
@@ -374,10 +379,12 @@ def install_plutonium(game: dict, game_key: str, steam_root: str,
         )
 
     prog(60, "Writing game path to config.json...")
-    # Pass all keys that share this appid so config has all paths for this prefix
+    # Pass all keys that share this appid so config has all paths for this prefix.
+    # installed_games must contain ALL installed games, not just the current one,
+    # so sibling keys (e.g. t4sp + t4mp share appid 10090) get their paths written too.
     appid = GAME_META[game_key][0]
     keys_for_appid = [k for k, v in GAME_META.items() if v[0] == appid]
-    _write_config(dest_plut_dir, keys_for_appid, {game_key: game})
+    _write_config(dest_plut_dir, keys_for_appid, installed_games)
 
     prog(80, "Writing launcher wrapper...")
     _write_wrapper(game, game_key, steam_root, proton_path,

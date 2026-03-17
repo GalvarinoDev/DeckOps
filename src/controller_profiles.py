@@ -141,18 +141,20 @@ def _patch_configset(configset_path: str, key: str, template_name: str):
     entry = f'\t"{key}"\n\t{{\n\t\t"template"\t\t"{template_name}"\n\t}}\n'
 
     if not os.path.exists(configset_path):
-        # Create minimal file
+        # Create minimal file — note the leading quote on "controller_config"
         with open(configset_path, "w", encoding="utf-8") as f:
-            f.write('controller_config"\n{\n' + entry + '}')
+            f.write('"controller_config"\n{\n' + entry + '}')
         return
 
     with open(configset_path, "r", encoding="utf-8", errors="replace") as f:
         content = f.read()
 
-    # Replace existing key block if present
-    pattern = rf'(\t"{re.escape(key)}"\n\t{{[^}}]*}}\n?)'
-    if re.search(pattern, content, re.MULTILINE):
-        content = re.sub(pattern, entry, content, flags=re.MULTILINE)
+    # Replace existing key block if present.
+    # Use re.DOTALL so the block interior matches across lines.
+    # \{{ and \}} are literal braces in the regex (escaped for f-string then regex).
+    pattern = rf'\t"{re.escape(key)}"\n\t\{{[^}}]*\}}\n?'
+    if re.search(pattern, content, re.MULTILINE | re.DOTALL):
+        content = re.sub(pattern, entry, content, flags=re.MULTILINE | re.DOTALL)
     else:
         # Insert before closing brace of root block
         content = content.rstrip()

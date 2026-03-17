@@ -298,38 +298,71 @@ def set_steam_input_enabled(steam_root, appids=None):
         with open(vdf_path, "r", errors="replace") as f:
             content = f.read()
 
+        def _find_block_end(text, start):
+            """Brace-depth parser that skips braces inside quoted strings."""
+            depth = 0
+            i = start
+            in_quote = False
+            while i < len(text):
+                c = text[i]
+                if c == '"' and (i == 0 or text[i - 1] != '\\'):
+                    in_quote = not in_quote
+                elif not in_quote:
+                    if c == '{':
+                        depth += 1
+                    elif c == '}':
+                        depth -= 1
+                        if depth == 0:
+                            return i
+                i += 1
+            return -1
+
         modified = False
         for appid in appids:
-            app_pattern = re.compile(
-                r'("' + re.escape(appid) + r'"\s*\{)(.*?)(\})',
-                re.IGNORECASE | re.DOTALL
+            key_pattern = re.compile(
+                r'"' + re.escape(appid) + r'"\s*\{',
+                re.IGNORECASE
             )
-            match = app_pattern.search(content)
-            if not match:
+            key_match = key_pattern.search(content)
+            if not key_match:
                 continue
 
-            app_block = match.group(2)
+            app_open  = key_match.end() - 1
+            app_close = _find_block_end(content, app_open)
+            if app_close == -1:
+                continue
+
+            app_block = content[app_open + 1:app_close]
+
             si_pattern = re.compile(
                 r'("UseSteamControllerConfig"\s*")([^"]*?)(")',
                 re.IGNORECASE
             )
-            si_match = si_pattern.search(app_block)
+
+            # Only patch the flat section, not inside any sub-blocks
+            subblock_match = re.search(r'"[^"]+"\s*\{', app_block)
+            flat_section = app_block[:subblock_match.start()] if subblock_match else app_block
+            si_match = si_pattern.search(flat_section)
 
             if si_match:
                 if si_match.group(2) == "1":
                     continue  # already enabled
                 new_block = si_pattern.sub(
                     lambda m: m.group(1) + "1" + m.group(3),
-                    app_block
+                    app_block,
+                    count=1,
                 )
             else:
-                new_block = app_block.rstrip() + \
-                    '\n\t\t\t"UseSteamControllerConfig"\t\t"1"\n\t\t'
+                indent_match = re.search(r'\n(\t+)"', flat_section)
+                indent = indent_match.group(1) if indent_match else '\t\t\t\t\t\t'
+                insert_pos = subblock_match.start() if subblock_match else len(app_block)
+                insert_str = f'{indent}"UseSteamControllerConfig"\t\t"1"\n'
+                new_block = app_block[:insert_pos] + insert_str + app_block[insert_pos:]
 
             content = (
-                content[:match.start(2)] +
+                content[:app_open + 1] +
                 new_block +
-                content[match.end(2):]
+                content[app_close:]
             )
             modified = True
 
@@ -391,10 +424,12 @@ def set_compat_tool(appids, version):
         for appid in appids:
             appid_str = str(appid)
             entry = _entry(appid_str)
+            # Use re.DOTALL so [^}] correctly spans multiple lines inside the block.
+            # The entry block is 4 lines, so [^}]* with DOTALL is required.
             pattern = rf'(\t+"{re.escape(appid_str)}"\n\t+\{{[^}}]*\}})'
-            if re.search(pattern, data, re.MULTILINE):
+            if re.search(pattern, data, re.MULTILINE | re.DOTALL):
                 # Replace existing block
-                data = re.sub(pattern, entry.rstrip('\n'), data, flags=re.MULTILINE)
+                data = re.sub(pattern, entry.rstrip('\n'), data, flags=re.MULTILINE | re.DOTALL)
             else:
                 # Insert after CompatToolMapping opening brace
                 data = re.sub(
