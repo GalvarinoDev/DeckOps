@@ -41,13 +41,19 @@ _FONT_LOADED      = False
 
 def _load_font():
     global _FONT_FAMILY, _FONT_FAMILY_DISP, _FONT_LOADED
+    if _FONT_LOADED:
+        return
     russo = os.path.join(FONTS_DIR, "RussoOne-Regular.ttf")
-    if os.path.exists(russo):
-        fid = QFontDatabase.addApplicationFont(russo)
-        fams = QFontDatabase.applicationFontFamilies(fid)
-        if fams:
-            _FONT_FAMILY      = fams[0]
-            _FONT_FAMILY_DISP = fams[0]
+    if not os.path.exists(russo):
+        raise FileNotFoundError(
+            f"Required font not found: {russo}\n"
+            f"Ensure assets/fonts/RussoOne-Regular.ttf is present in the repo."
+        )
+    fid = QFontDatabase.addApplicationFont(russo)
+    fams = QFontDatabase.applicationFontFamilies(fid)
+    if fams:
+        _FONT_FAMILY      = fams[0]
+        _FONT_FAMILY_DISP = fams[0]
     _FONT_LOADED = True
 
 def font(size=13, bold=False, weight=None, display=False):
@@ -259,6 +265,16 @@ class BootstrapScreen(QWidget):
         ), daemon=True).start()
 
     def _proceed(self):
+        # Re-load font and re-apply stylesheet now that bootstrap has completed.
+        # This is a no-op if the font was already loaded at startup, but ensures
+        # the correct font is applied even on a fresh install where bootstrap
+        # runs for the first time.
+        try:
+            _load_font()
+            QApplication.instance().setStyleSheet(_app_style())
+        except FileNotFoundError:
+            pass  # Font missing — fall back gracefully, app still works
+
         if cfg.is_first_run():
             self.stack.setCurrentIndex(1)
         else:

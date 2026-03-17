@@ -1,9 +1,12 @@
 """
 bootstrap.py — DeckOps pre-launch asset fetcher
 
-Downloads Russo One font and Steam header images into the assets folder
-before the PyQt5 UI initialises. Called from BootstrapScreen on a background
-thread so the UI can show progress.
+Downloads Steam header images into the assets folder before the PyQt5 UI
+initialises. Called from BootstrapScreen on a background thread so the UI
+can show progress.
+
+Russo One font is NOT downloaded here — it is bundled with the repo at
+assets/fonts/RussoOne-Regular.ttf and is always available immediately.
 
 Music is NOT downloaded here. If assets/music/background.mp3 is present it
 will be played automatically. Users can drop any MP3 file there themselves.
@@ -23,15 +26,15 @@ os.makedirs(FONTS_DIR,   exist_ok=True)
 os.makedirs(HEADERS_DIR, exist_ok=True)
 os.makedirs(MUSIC_DIR,   exist_ok=True)
 
-# ── font sources ──────────────────────────────────────────────────────────────
-# Russo One — hosted directly in the DeckOps repo, MIT licensed.
+# ── font ──────────────────────────────────────────────────────────────────────
+# Russo One is shipped with the repo in assets/fonts/ — no download needed.
+# bootstrap.py does not download fonts. _load_font() in ui_qt.py loads it
+# directly from disk on every launch.
 
 FONT_FILE = "RussoOne-Regular.ttf"
-FONT_URL  = "https://raw.githubusercontent.com/GalvarinoDev/DeckOps/main/assets/fonts/RussoOne-Regular.ttf"
 
-FONTS = {
-    FONT_FILE: FONT_URL,
-}
+# No remote font downloads
+FONTS = {}
 
 # ── Steam header images ───────────────────────────────────────────────────────
 
@@ -127,6 +130,7 @@ def run(on_progress=None, on_complete=None):
 
 
 def fonts_ready() -> bool:
+    """Returns True if the bundled Russo One font file is present on disk."""
     return os.path.exists(os.path.join(FONTS_DIR, FONT_FILE))
 
 
