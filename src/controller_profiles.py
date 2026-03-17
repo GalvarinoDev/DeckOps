@@ -47,7 +47,7 @@ TEMPLATES = [
 #              Input per session (CoD4, which shares one appid for SP and MP)
 
 APPID_PROFILE_MAP = {
-    "7940":   "both",      # CoD4 — SP (IW3SP-MOD) + MP (CoD4x) share one appid
+    "7940":   "standard",  # CoD4 — SP only (IW3SP-MOD); MP (CoD4x) handled by non-Steam shortcut
     "10090":  "standard",  # WaW  — Plutonium SP/ZM/MP
     "10180":  "other",     # MW2 SP — via Steam, KB+M layout
     "10190":  "standard",  # MW2 MP — iw4x
@@ -65,8 +65,7 @@ APPID_PROFILE_MAP = {
 # We patch both the numeric appid key AND any named keys.
 
 APPID_NAMED_KEYS = {
-    "7940":   ["call of duty 4 modern warfare (2007)",
-               "call of duty 4 modern warfare - multiplayer"],
+    "7940":   ["call of duty 4 modern warfare (2007)"],
     "10090":  ["call of duty world at war",
                "call of duty world at war - multiplayer"],
     "10180":  ["call of duty modern warfare 2 (2009) - multiplayer"],

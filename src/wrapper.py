@@ -106,6 +106,31 @@ def write_wrapper_script(exe_path, script_content, original_size=None):
              stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
 
+def _find_block_end(text, start):
+    """
+    Brace-depth parser that returns the index of the closing brace of the
+    block opened at `start`. Skips braces inside quoted strings so that
+    bash substitutions (e.g. ${@/iw3sp.exe/iw3sp_mod.exe}) in VDF values
+    are not mistaken for block delimiters.
+    """
+    depth = 0
+    i = start
+    in_quote = False
+    while i < len(text):
+        c = text[i]
+        if c == '"' and (i == 0 or text[i - 1] != '\\'):
+            in_quote = not in_quote
+        elif not in_quote:
+            if c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+                if depth == 0:
+                    return i
+        i += 1
+    return -1  # malformed
+
+
 def set_launch_options(steam_root, appid, options):
     """
     Set or append launch options for a Steam game in localconfig.vdf.
@@ -152,24 +177,6 @@ def set_launch_options(steam_root, appid, options):
         key_match = key_pattern.search(content)
         if not key_match:
             continue
-
-        def _find_block_end(text, start):
-            depth = 0
-            i = start
-            in_quote = False
-            while i < len(text):
-                c = text[i]
-                if c == '"' and (i == 0 or text[i-1] != '\\'):
-                    in_quote = not in_quote
-                elif not in_quote:
-                    if c == '{':
-                        depth += 1
-                    elif c == '}':
-                        depth -= 1
-                        if depth == 0:
-                            return i
-                i += 1
-            return -1  # malformed
 
         app_open  = key_match.end() - 1
         app_close = _find_block_end(content, app_open)
@@ -297,25 +304,6 @@ def set_steam_input_enabled(steam_root, appids=None):
 
         with open(vdf_path, "r", errors="replace") as f:
             content = f.read()
-
-        def _find_block_end(text, start):
-            """Brace-depth parser that skips braces inside quoted strings."""
-            depth = 0
-            i = start
-            in_quote = False
-            while i < len(text):
-                c = text[i]
-                if c == '"' and (i == 0 or text[i - 1] != '\\'):
-                    in_quote = not in_quote
-                elif not in_quote:
-                    if c == '{':
-                        depth += 1
-                    elif c == '}':
-                        depth -= 1
-                        if depth == 0:
-                            return i
-                i += 1
-            return -1
 
         modified = False
         for appid in appids:
@@ -476,33 +464,43 @@ def set_default_launch_option(steam_root, appids_config):
                 f'\t\t\t\t\t}}\n'
             )
 
-            # Check if appid block exists
-            app_pattern = re.compile(
-                r'("' + re.escape(appid) + r'"\s*\{)(.*?)(\})',
+            # Use brace-depth parser to find the true appid block boundaries.
+            # The regex (.*?) approach is broken — it matches only up to the
+            # first closing brace inside the block, cutting it short and
+            # corrupting adjacent keys on write.
+            key_pattern = re.compile(
+                r'"' + re.escape(appid) + r'"\s*\{',
+                re.IGNORECASE
+            )
+            key_match = key_pattern.search(content)
+            if not key_match:
+                continue
+
+            app_open  = key_match.end() - 1
+            app_close = _find_block_end(content, app_open)
+            if app_close == -1:
+                continue
+
+            app_block = content[app_open + 1:app_close]
+
+            dlo_pattern = re.compile(
+                r'"DefaultLaunchOption"\s*\{[^}]*\}',
                 re.IGNORECASE | re.DOTALL
             )
-            match = app_pattern.search(content)
 
-            if match:
-                app_block = match.group(2)
-                dlo_pattern = re.compile(
-                    r'"DefaultLaunchOption"\s*\{[^}]*\}',
-                    re.IGNORECASE | re.DOTALL
-                )
+            if dlo_pattern.search(app_block):
+                # Replace existing DefaultLaunchOption
+                new_block = dlo_pattern.sub(entry.strip(), app_block)
+            else:
+                # Insert DefaultLaunchOption into existing app block
+                new_block = app_block.rstrip() + '\n' + entry + '\t\t\t\t'
 
-                if dlo_pattern.search(app_block):
-                    # Replace existing DefaultLaunchOption
-                    new_block = dlo_pattern.sub(entry.strip(), app_block)
-                else:
-                    # Insert DefaultLaunchOption into existing app block
-                    new_block = app_block.rstrip() + '\n' + entry + '\t\t\t\t'
-
-                content = (
-                    content[:match.start(2)] +
-                    new_block +
-                    content[match.end(2):]
-                )
-                modified = True
+            content = (
+                content[:app_open + 1] +
+                new_block +
+                content[app_close:]
+            )
+            modified = True
 
         if modified:
             with open(vdf_path, "w", errors="replace") as f:
