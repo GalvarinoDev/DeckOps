@@ -744,6 +744,23 @@ class InstallScreen(QWidget):
                 except Exception as ex:
                     self._s.log.emit(f"✗  {base_name} ({key}) failed: {ex}")
 
+        # ── game display configs ──────────────────────────────────────────────
+        try:
+            from game_config import write_game_configs, write_bo2_config
+            compatdata_root = os.path.join(
+                os.path.expanduser("~"),
+                ".local/share/Steam/steamapps/compatdata"
+            )
+            for key, gd, game in self.selected:
+                install_dir = game.get("install_dir", "")
+                if key in ("t6mp", "t6zm"):
+                    write_bo2_config(key, compatdata_root)
+                elif install_dir:
+                    write_game_configs(key, install_dir)
+            self._s.log.emit("✓  Game display configs written")
+        except Exception as ex:
+            self._s.log.emit(f"  Game configs skipped: {ex}")
+
         # ── Controller templates + profiles (after all games) ─────────────────
         self._s.progress.emit(90, "Installing controller templates...")
         self._s.log.emit("Installing controller templates...")
@@ -781,21 +798,6 @@ class InstallScreen(QWidget):
             )
         except Exception as ex:
             self._s.log.emit(f"  Shortcuts skipped: {ex}")
-
-        # ── Game display configs (after shortcuts) ────────────────────────────
-        try:
-            from game_config import apply_game_configs
-            self._s.log.emit("Applying game display configs...")
-            apply_game_configs(
-                selected_keys=selected_keys,
-                installed_games={k: g for k, _, g in self.selected},
-                steam_root=self.steam_root,
-                deck_model=cfg.get_deck_model() or "oled",
-                on_progress=lambda msg: self._s.log.emit(msg),
-            )
-            self._s.log.emit("✓  Game display configs applied")
-        except Exception as ex:
-            self._s.log.emit(f"  Game configs skipped: {ex}")
 
         cfg.complete_first_run(self.steam_root)
         self._s.progress.emit(100, "All done!")
@@ -932,7 +934,7 @@ class ManagementScreen(QWidget):
         title = QLabel("DECKOPS"); title.setFont(font(22, display=True))
         title.setStyleSheet("color:#FFF;background:transparent;")
         hl.addWidget(title); hl.addStretch()
-        guide_btn = _btn("📋  Setup Guide", C_BLUE_BTN, size=11, h=36); guide_btn.setFixedWidth(140)
+        guide_btn = _btn("📋  Guide", C_BLUE_BTN, size=11, h=36); guide_btn.setFixedWidth(100)
         guide_btn.clicked.connect(lambda: self.stack.setCurrentIndex(7))
         hl.addWidget(guide_btn)
         hl.addSpacing(8)
@@ -1082,6 +1084,16 @@ class ControllerInfoScreen(QWidget):
             "Newest GE-Proton installed and set for all games.",
             12, C_DIM, align=Qt.AlignLeft))
 
+        lay.addWidget(_hdiv())
+
+        # ── MW1 / WaW launch mode instruction ─────────────────────────────────
+        lay.addWidget(_lbl("⚠  First Launch - Modern Warfare 1 & World at War", 13, C_TREY, bold=True, align=Qt.AlignLeft))
+        lay.addWidget(_lbl(
+            "When launching either game for the first time, Steam will ask which mode you want to launch. "
+            "Select Singleplayer or Campaign and set it as your default. "
+            "Multiplayer for these games launches via the DeckOps shortcuts in your library instead.",
+            12, C_DIM, align=Qt.AlignLeft))
+
         lay.addStretch()
 
         cont = _btn("Launch Steam & Continue  >>", C_IW, h=52)
@@ -1151,7 +1163,7 @@ class ConfigureScreen(QWidget):
         lay.addWidget(_lbl("Controller Profiles", 14, "#CCC", align=Qt.AlignLeft))
         cr = QHBoxLayout(); cr.setSpacing(12)
         ctrl_btn  = _btn("Re-apply Templates", C_DARK_BTN, size=12, h=40)
-        guide_btn = _btn("Setup Guide", C_BLUE_BTN, size=12, h=40)
+        guide_btn = _btn("Guide", C_BLUE_BTN, size=12, h=40)
         ctrl_btn.clicked.connect(self._apply_controller_profiles)
         guide_btn.clicked.connect(lambda: self.stack.setCurrentIndex(7))
         cr.addWidget(ctrl_btn); cr.addWidget(guide_btn); cr.addStretch()
