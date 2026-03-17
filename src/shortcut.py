@@ -218,27 +218,38 @@ def _read_shortcuts_raw(path: str) -> bytes:
 
 
 def _get_next_index(raw_data: bytes) -> int:
-    """Find the next available index from raw shortcut data."""
+    """
+    Find the next available shortcut index from raw shortcut entry data.
+
+    Shortcut entries start with the byte sequence: 0x00 <index_str> 0x00
+    immediately followed by 0x02 (the appid int field marker). This two-byte
+    lookahead distinguishes real entry headers from the many other 0x00...0x00
+    numeric sequences present in binary VDF data (string lengths, field values, etc.).
+    """
     if not raw_data:
         return 0
-    
-    # Find all index markers: \x00<digit(s)>\x00
+
     indices = []
     i = 0
-    while i < len(raw_data):
-        if raw_data[i:i+1] == b'\x00':
+    while i < len(raw_data) - 2:
+        if raw_data[i] == 0x00:
             end = raw_data.find(b'\x00', i + 1)
-            if end != -1:
-                try:
-                    idx_str = raw_data[i+1:end].decode('utf-8')
-                    if idx_str.isdigit():
-                        indices.append(int(idx_str))
-                except:
-                    pass
-            i = end + 1 if end != -1 else i + 1
+            if end != -1 and end > i + 1:
+                # Only treat as an entry index if immediately followed by
+                # 0x02 (int32 field type byte for the 'appid' field header)
+                if end + 1 < len(raw_data) and raw_data[end + 1] == 0x02:
+                    try:
+                        idx_str = raw_data[i + 1:end].decode('utf-8')
+                        if idx_str.isdigit():
+                            indices.append(int(idx_str))
+                    except (UnicodeDecodeError, ValueError):
+                        pass
+                i = end + 1
+            else:
+                i += 1
         else:
             i += 1
-    
+
     return max(indices, default=-1) + 1
 
 
@@ -331,24 +342,24 @@ def _assign_controller_config(uid: str, appid: int, shortcut_def: dict,
 def _patch_configset(configset_path: str, key: str, template_name: str):
     """Patch configset_controller_neptune.vdf to set our template as default."""
     entry = f'\t"{key}"\n\t{{\n\t\t"template"\t\t"{template_name}"\n\t}}\n'
-    
+
     if not os.path.exists(configset_path):
         os.makedirs(os.path.dirname(configset_path), exist_ok=True)
         with open(configset_path, "w", encoding="utf-8") as f:
             f.write('"controller_config"\n{\n' + entry + '}\n')
         return
-    
+
     with open(configset_path, "r", encoding="utf-8", errors="replace") as f:
         content = f.read()
-    
-    pattern = rf'(\t"{re.escape(key)}"\n\t\{{[^\}}]*\}}\n?)'
-    if re.search(pattern, content, re.MULTILINE):
-        content = re.sub(pattern, entry, content, flags=re.MULTILINE)
+
+    pattern = rf'\t"{re.escape(key)}"\n\t\{{[^}}]*\}}\n?'
+    if re.search(pattern, content, re.MULTILINE | re.DOTALL):
+        content = re.sub(pattern, entry, content, flags=re.MULTILINE | re.DOTALL)
     else:
         content = content.rstrip()
         if content.endswith("}"):
             content = content[:-1].rstrip() + "\n" + entry + "}\n"
-    
+
     with open(configset_path, "w", encoding="utf-8") as f:
         f.write(content)
 
@@ -459,30 +470,81 @@ def remove_shortcuts(on_progress=None):
     def prog(msg):
         if on_progress:
             on_progress(msg)
-    
+
     shortcut_names = {s["name"] for s in SHORTCUTS.values()}
-    
+
     for uid in _find_all_steam_uids():
         shortcuts_path = os.path.join(USERDATA_DIR, uid, "config", "shortcuts.vdf")
         if not os.path.exists(shortcuts_path):
             continue
-        
+
         try:
             with open(shortcuts_path, 'rb') as f:
                 data = f.read()
         except Exception:
             continue
-        
-        found = False
-        for name in shortcut_names:
-            if name.encode('utf-8') in data:
-                found = True
-                break
-        
-        if not found:
+
+        # Check if any DeckOps shortcut names are present at all
+        if not any(name.encode('utf-8') in data for name in shortcut_names):
             continue
-        
-        prog(f"  ⚠ Manual removal may be needed for user {uid}")
+
+        # Strip header/footer, collect non-DeckOps entries, rewrite
+        existing_raw = _read_shortcuts_raw(shortcuts_path)
+        if not existing_raw:
+            continue
+
+        # Walk entries: each starts with 0x00 <index> 0x00 0x02
+        # Collect byte ranges for entries we want to KEEP
+        kept_entries = []
+        i = 0
+        while i < len(existing_raw):
+            # Find entry start
+            if existing_raw[i] != 0x00:
+                i += 1
+                continue
+            end_idx = existing_raw.find(b'\x00', i + 1)
+            if end_idx == -1 or end_idx + 1 >= len(existing_raw):
+                i += 1
+                continue
+            if existing_raw[end_idx + 1] != 0x02:
+                i += 1
+                continue
+
+            # Found an entry header at i — find where this entry ends (0x08 terminator)
+            entry_start = i
+            entry_end = existing_raw.find(b'\x08', end_idx)
+            if entry_end == -1:
+                break
+            entry_end += 1  # include the terminator byte
+
+            entry_bytes = existing_raw[entry_start:entry_end]
+
+            # Check if this entry belongs to DeckOps
+            is_deckops = any(name.encode('utf-8') in entry_bytes for name in shortcut_names)
+            if not is_deckops:
+                kept_entries.append(entry_bytes)
+            else:
+                prog(f"  Removing shortcut for user {uid}...")
+
+            i = entry_end
+
+        # Re-index kept entries so indices are sequential from 0
+        reindexed = []
+        for new_idx, entry_bytes in enumerate(kept_entries):
+            # Replace the old index in the entry header: 0x00 <old_idx_str> 0x00
+            old_end = entry_bytes.find(b'\x00', 1)
+            if old_end != -1:
+                reindexed.append(
+                    b'\x00' + str(new_idx).encode('utf-8') + entry_bytes[old_end:]
+                )
+            else:
+                reindexed.append(entry_bytes)
+
+        try:
+            _write_shortcuts_vdf(shortcuts_path, b''.join(reindexed), [])
+            prog(f"  ✓ Shortcuts removed for user {uid}")
+        except Exception as e:
+            prog(f"  ⚠ Could not write shortcuts.vdf for user {uid}: {e}")
 
 
 # ── CLI for testing ───────────────────────────────────────────────────────────

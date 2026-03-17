@@ -11,7 +11,6 @@ Progress is reported via a callback:
 
 import os
 import zipfile
-import subprocess
 import urllib.request
 
 BASE_URL = "https://github.com/iw4x/iw4x-client/releases/latest/download"
@@ -164,15 +163,18 @@ def install_iw4x(game: dict, steam_root: str,
     if errors:
         raise RuntimeError("iwd download failed:\n" + "\n".join(errors))
 
-    # Write launch option via xterm — konsole conflicts with Qt
+    # Set Steam launch option directly — no shell script or xterm needed.
+    # Must be called after kill_steam() so localconfig.vdf is not overwritten
+    # by Steam's cloud sync after we write it.
     prog(92, "Setting Steam launch option...")
-    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "set_launch_iw4x.sh")
     try:
-        subprocess.run([
-            "xterm", "-fa", "Monospace", "-fs", "12",
-            "-title", "DeckOps - Applying launch option...",
-            "-e", "bash", script
-        ], check=True)
+        from wrapper import set_launch_options
+        set_launch_options(
+            steam_root,
+            "10190",
+            "bash -c 'exec \"${@/iw4mp.exe/iw4x.exe}\"' -- %command%",
+        )
+        prog(94, "  ✓ Launch option set.")
     except Exception as ex:
         prog(92, f"Warning: could not set launch option: {ex}")
 

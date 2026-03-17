@@ -106,6 +106,17 @@ def _is_prefix_ready(steam_root: str, appid: int) -> bool:
     )
     return os.path.isdir(prefix)
 
+
+def _all_prefixes_ready(steam_root: str, gd: dict) -> bool:
+    """
+    Check that ALL required Proton prefixes exist for a game card.
+    Some games (BO1) have keys that map to different appids (42700 SP, 42710 MP)
+    and both prefixes must exist before setup is safe to proceed.
+    """
+    from detect_games import GAMES
+    appids_needed = {GAMES[k]["appid"] for k in gd["keys"] if k in GAMES}
+    return all(_is_prefix_ready(steam_root, aid) for aid in appids_needed)
+
 SP_IMAGE_URLS = {
     7940:   "https://shared.steamstatic.com/store_item_assets/steam/apps/7940/header.jpg",
     10190:  "https://shared.steamstatic.com/store_item_assets/steam/apps/10180/header.jpg",
@@ -429,8 +440,8 @@ class SetupScreen(QWidget):
             base = gd["base"]; done = any(cfg.is_game_setup(k) for k in ik)
             color = C_IW if gd["dev"]=="iw" else C_TREY
             
-            # Check if prefix exists (game has been launched through Steam)
-            prefix_ready = _is_prefix_ready(self.steam_root, gd["appid"])
+            # Check that ALL required prefixes exist (some games span multiple appids)
+            prefix_ready = _all_prefixes_ready(self.steam_root, gd)
             
             row = QHBoxLayout(); row.setSpacing(16); row.setContentsMargins(8,8,8,8)
             cb = QCheckBox()
@@ -1025,11 +1036,10 @@ class ControllerInfoScreen(QWidget):
         # ── Controller profiles section ────────────────────────────────────────
         lay.addWidget(_lbl("✓  Controller Profiles", 13, C_IW, bold=True, align=Qt.AlignLeft))
 
-        gyro_mode = cfg.get_gyro_mode() or "hold"
-        gyro_desc = "R5 held" if gyro_mode == "hold" else "R5 toggles"
-        lay.addWidget(_lbl(
-            f"Standard gamepad layout with gyro aiming ({gyro_desc}) assigned to all games.",
-            12, C_DIM, align=Qt.AlignLeft))
+        # gyro_desc is set dynamically in showEvent so it always reflects the
+        # user's actual choice, not whatever was in config at construction time.
+        self._gyro_lbl = _lbl("", 12, C_DIM, align=Qt.AlignLeft)
+        lay.addWidget(self._gyro_lbl)
 
         # Exceptions note
         exceptions_frame = QFrame()
@@ -1065,23 +1075,19 @@ class ControllerInfoScreen(QWidget):
         cw = QHBoxLayout(); cw.addStretch(); cw.addWidget(cont, stretch=1); cw.addStretch()
         lay.addLayout(cw)
 
+    def showEvent(self, e):
+        super().showEvent(e)
+        gyro_mode = cfg.get_gyro_mode() or "hold"
+        gyro_desc = "R5 held" if gyro_mode == "hold" else "R5 toggles"
+        self._gyro_lbl.setText(
+            f"Standard gamepad layout with gyro aiming ({gyro_desc}) assigned to all games."
+        )
+
     def _launch_steam_and_continue(self):
-        # Re-run launch option scripts immediately before Steam starts —
-        # last possible moment to write before Steam reads localconfig.vdf.
-        src_dir = os.path.dirname(os.path.abspath(__file__))
-        import subprocess as _sp
-        for script in ["set_launch_iw3sp.sh", "set_launch_iw4x.sh"]:
-            path = os.path.join(src_dir, script)
-            if os.path.exists(path):
-                try:
-                    _sp.run([
-                        "xterm", "-fa", "Monospace", "-fs", "12",
-                        "-title", "DeckOps - Applying launch option...",
-                        "-e", "bash", path
-                    ], check=True)
-                except Exception:
-                    pass
-        # Launch Steam in background
+        # Launch Steam in background — launch options were already written
+        # during install via set_launch_options() in iw3sp.py / iw4x.py.
+        # Do NOT re-run them here: Steam's cloud sync runs on startup and
+        # would overwrite localconfig.vdf immediately after any write we do.
         try:
             subprocess.Popen(["steam"], start_new_session=True)
         except Exception:

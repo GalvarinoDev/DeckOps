@@ -15,7 +15,6 @@ Progress is reported via a callback:
 import os
 import json
 import zipfile
-import subprocess
 import urllib.request
 
 BASE_URL      = "https://gitea.com/JerryALT/iw3sp_mod/releases/download/v4.1.5/iw3sp_mod_v4.1.5.zip"
@@ -105,15 +104,18 @@ def install_iw3sp(game: dict, steam_root: str,
     with open(meta_path, "w") as f:
         json.dump({"version": "4.1.5"}, f, indent=2)
 
-    # Write launch option via xterm — konsole conflicts with Qt
+    # Set Steam launch option directly — no shell script or xterm needed.
+    # Must be called after kill_steam() so localconfig.vdf is not overwritten
+    # by Steam's cloud sync after we write it.
     prog(90, "Setting Steam launch option...")
-    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "set_launch_iw3sp.sh")
     try:
-        subprocess.run([
-            "xterm", "-fa", "Monospace", "-fs", "12",
-            "-title", "DeckOps - Applying launch option...",
-            "-e", "bash", script
-        ], check=True)
+        from wrapper import set_launch_options
+        set_launch_options(
+            steam_root,
+            "7940",
+            "bash -c 'exec \"${@/iw3sp.exe/iw3sp_mod.exe}\"' -- %command%",
+        )
+        prog(92, "  ✓ Launch option set.")
     except Exception as ex:
         prog(90, f"Warning: could not set launch option: {ex}")
 
