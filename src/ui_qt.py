@@ -1037,17 +1037,11 @@ class ControllerInfoScreen(QWidget):
         lay.addWidget(_hdiv())
 
         # ── Warning box ────────────────────────────────────────────────────────
-        warn_frame = QFrame()
-        warn_frame.setStyleSheet(
-            f"QFrame{{background:#1A1A10;border:2px solid {C_TREY};border-radius:8px;}}"
-        )
-        wl = QVBoxLayout(warn_frame); wl.setContentsMargins(16,12,16,12); wl.setSpacing(8)
-        wl.addWidget(_lbl("⚠  IMPORTANT", 13, C_TREY, bold=True, align=Qt.AlignLeft))
-        wl.addWidget(_lbl(
+        lay.addWidget(_lbl("⚠  Important - Cloud Saves & Safe Mode", 13, C_TREY, bold=True, align=Qt.AlignLeft))
+        lay.addWidget(_lbl(
             "If Steam asks about cloud saves, choose Keep Local. If a game asks for Safe Mode, choose No.",
-            12, "#CCC", align=Qt.AlignLeft))
-        lay.addWidget(warn_frame)
-        lay.addSpacing(4)
+            12, C_DIM, align=Qt.AlignLeft))
+        lay.addWidget(_hdiv())
 
         # ── Controller profiles section ────────────────────────────────────────
         lay.addWidget(_lbl("✓  Controller Profiles", 13, C_IW, bold=True, align=Qt.AlignLeft))
