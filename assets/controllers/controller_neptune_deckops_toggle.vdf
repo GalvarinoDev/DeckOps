@@ -460,7 +460,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button JOYSTICK_RIGHT"
+							"binding"		"mouse_button LEFT, , "
 						}
 					}
 				}
