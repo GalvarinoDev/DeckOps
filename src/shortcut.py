@@ -414,42 +414,80 @@ def create_shortcuts(installed_games: dict, selected_keys: list,
             exe_path = os.path.join(install_dir, shortcut_def["exe_name"])
             game_appid = shortcut_def["game_appid"]
             compatdata_path = os.path.join(COMPAT_ROOT, game_appid)
-            
+
+            # For t4mp (WaW Multiplayer), plutonium.py has replaced CoDWaWmp.exe
+            # with a bash wrapper — Proton cannot run it as a Windows binary.
+            # Point the shortcut directly at plutonium-launcher-win32.exe instead,
+            # passing the protocol URL as a launch argument after %command%.
+            # exe_path (CoDWaWmp.exe) is still used for appid calculation so any
+            # existing shortcut entry in Steam is not invalidated.
+            if key == "t4mp":
+                plut_launcher = os.path.join(
+                    compatdata_path,
+                    "pfx", "drive_c", "users", "steamuser",
+                    "AppData", "Local", "Plutonium", "bin",
+                    "plutonium-launcher-win32.exe",
+                )
+                actual_exe     = plut_launcher
+                launch_options = (
+                    f'STEAM_COMPAT_DATA_PATH="{compatdata_path}" '
+                    f'%command% "plutonium://play/t4mp"'
+                )
+            else:
+                actual_exe     = exe_path
+                launch_options = f'STEAM_COMPAT_DATA_PATH="{compatdata_path}" %command%'
+
             shortcut_appid = _calc_shortcut_appid(exe_path, name)
-            
+
             prog(f"  → {name}")
             prog(f"    appid: {shortcut_appid}")
-            
+
             if name in existing_names:
                 prog(f"    ✓ Shortcut exists")
             else:
                 icon_path = os.path.join(grid_dir, f"{shortcut_appid}_icon.{shortcut_def['icon_ext']}")
-                
+
                 entry = {
-                    "appid":              _to_signed32(shortcut_appid),
-                    "AppName":            name,
-                    "Exe":                f'"{exe_path}"',
-                    "StartDir":           f'"{install_dir}"',
-                    "icon":               icon_path,
-                    "ShortcutPath":       "",
-                    "LaunchOptions":      f'STEAM_COMPAT_DATA_PATH="{compatdata_path}" %command%',
-                    "IsHidden":           0,
-                    "AllowDesktopConfig": 1,
-                    "AllowOverlay":       1,
-                    "OpenVR":             0,
-                    "Devkit":             0,
-                    "DevkitGameID":       "",
+                    "appid":               _to_signed32(shortcut_appid),
+                    "AppName":             name,
+                    "Exe":                 f'"{actual_exe}"',
+                    "StartDir":            f'"{install_dir}"',
+                    "icon":                icon_path,
+                    "ShortcutPath":        "",
+                    "LaunchOptions":       launch_options,
+                    "IsHidden":            0,
+                    "AllowDesktopConfig":  1,
+                    "AllowOverlay":        1,
+                    "OpenVR":              0,
+                    "Devkit":              0,
+                    "DevkitGameID":        "",
                     "DevkitOverrideAppID": 0,
-                    "LastPlayTime":       int(time.time()),
-                    "FlatpakAppID":       "",
-                    "tags":               {"0": "DeckOps"},
+                    "LastPlayTime":        int(time.time()),
+                    "FlatpakAppID":        "",
+                    "tags":                {"0": "DeckOps"},
                 }
-                
+
                 entry_bytes = _make_shortcut_entry(next_idx, entry)
                 new_entries.append(entry_bytes)
                 next_idx += 1
                 prog(f"    ✓ Shortcut created")
-            
+
+            # Set GE-Proton as the compat tool for this shortcut's appid,
+            # the same way it is set for regular Steam games in ge_proton.py.
+            # We use the shortcut_appid (not game_appid) because config.vdf
+            # CompatToolMapping is keyed on the appid Steam actually launches.
+            try:
+                import config as cfg
+                from wrapper import set_compat_tool
+                ge_version = cfg.get_ge_proton_version()
+                if ge_version:
+                    set_compat_tool([str(shortcut_appid)], ge_version)
+                    prog(f"    ✓ GE-Proton {ge_version} set")
+                else:
+                    prog(f"    ⚠ GE-Proton version unknown — compat tool not set")
+            except Exception as ex:
+                prog(f"    ⚠ Could not set GE-Proton for shortcut: {ex}")
+
             _download_artwork(grid_dir, shortcut_appid, shortcut_def, prog)
             _assign_controller_config(uid, shortcut_appid, shortcut_def, gyro_mode, prog)
         
