@@ -24,7 +24,9 @@ DeckOps automates the installation of iw4x, CoD4x, IW3SP-MOD, and Plutonium on S
 
 4. Double-click it
    - **First time:** DeckOps installs automatically
-   - **Already installed:** A menu appears - choose to Launch, Reinstall, or Uninstall
+   - **Already installed:** A menu appears — choose to Launch, Reinstall, or Uninstall
+
+> Keep the DeckOps file on your Deck. Double-clicking it is how you launch, reinstall, or uninstall DeckOps in the future.
 
 > Your Steam games are never touched. Only the files DeckOps created are removed during uninstall.
 
@@ -33,19 +35,40 @@ DeckOps automates the installation of iw4x, CoD4x, IW3SP-MOD, and Plutonium on S
 ## Requirements
 
 - Steam Deck running SteamOS
-- Each game installed through Steam and launched at least once through Steam before running DeckOps
-- Plutonium games require a free account at [plutonium.pw](https://plutonium.pw)
 - GE-Proton will be automatically downloaded and installed by DeckOps if not already present
+- Plutonium games require a free account at [plutonium.pw](https://plutonium.pw)
+- Each supported game must be **installed through Steam and launched at least once** before running DeckOps — see the table below for which modes need to be launched
 
-> DeckOps will show which games haven't been launched yet and prevent you from selecting them until ready.
+> DeckOps will show which games haven't been launched yet and prevent you from selecting them until they're ready.
 
-> **GE-Proton** is set as the compatibility tool for all supported games. If you already have GE-Proton installed (e.g. via ProtonUp-Qt), DeckOps will use your existing installation and only download a newer version if one is available.
+> **GE-Proton:** If you already have GE-Proton installed (e.g. via ProtonUp-Qt), DeckOps will use it. If a newer version is available it will be downloaded automatically.
+
+---
+
+## ⚠️ Before You Install
+
+**Each game must be launched through Steam in the correct modes before running DeckOps.** This creates the Proton prefix and starts shader cache downloads. Skipping this step is the most common cause of install failures.
+
+| Game | Launch these modes in Steam first |
+|---|---|
+| Call of Duty 4 | Multiplayer **and** Singleplayer |
+| Modern Warfare 2 | Multiplayer |
+| Modern Warfare 3 | Multiplayer |
+| World at War | Campaign **and** Multiplayer |
+| Black Ops | Campaign **and** Multiplayer |
+| Black Ops II | Multiplayer **and** Zombies |
+
+> MW2 and MW3 Campaign are launched natively through Steam — no extra steps needed for those.
 
 ---
 
 ## ⚠️ After Installation
 
 **Launch Steam in Desktop Mode before switching to Game Mode.** This lets Steam reload the config changes DeckOps made. Then switch to Game Mode and play normally.
+
+**If Steam asks about cloud saves, choose Keep Local.** DeckOps writes display and controller configs locally — choosing Upload or letting Steam overwrite will undo them.
+
+**CoD4 Multiplayer requires two launches to finish setup.** Launch it once through Steam, let it close on its own, then launch it again. This is normal.
 
 > DeckOps sets GE-Proton as the compatibility tool for all supported games. Other games in your library are not affected.
 
@@ -66,25 +89,31 @@ DeckOps automates the installation of iw4x, CoD4x, IW3SP-MOD, and Plutonium on S
 | Black Ops II - Campaign | via Steam | LCD + OLED | SP | ✅ | ❌ | ✅ |
 | Black Ops II - Multiplayer & Zombies | Plutonium | OLED only | MP / ZM | ✅ | ✅ | ✅ |
 
-> Gyro is implemented via Steam Input and works on all titles regardless of native client support.
+> Gyro is implemented via Steam Input and works on all titles regardless of native client support. During setup you'll choose between **Hold** (gyro active while R5 is held) or **Toggle** (R5 press turns gyro on/off). You can change this anytime in **Settings → Re-apply Controller Profiles**.
 
-> **Steam Deck LCD:** Plutonium servers require OLED. For offline Campaign and Zombies on LCD, see [PlutoniumAltLauncher](https://github.com/framilano/PlutoniumAltLauncher).
+> **Steam Deck LCD:** Plutonium online servers require OLED. For offline Campaign and Zombies on LCD, see [PlutoniumAltLauncher](https://github.com/framilano/PlutoniumAltLauncher).
 
 ---
 
 ## 🔧 Troubleshooting
 
+**CoD4 Multiplayer won't launch or crashes on first run?**
+This is normal — it needs to be launched twice through Steam to finish setup. Launch it once, let it close, then launch again.
+
 **Shortcuts not using GE-Proton?**
-Go to **Settings -> Repair Shortcuts** to re-apply GE-Proton and controller configs.
+Go to **Settings → Repair Shortcuts** to re-apply GE-Proton and controller configs.
 
 **Controller profiles not working?**
-Go to **Settings -> Re-apply Templates** to reinstall controller profiles.
+Go to **Settings → Re-apply Controller Profiles** to reinstall controller templates.
 
-**Game asks for Safe Mode or override config?**
-Choose **No** - DeckOps has already configured optimal settings.
+**Game asks for Safe Mode or to override config?**
+Choose **No** — DeckOps has already configured optimal settings.
 
 **Cloud save out of sync?**
 Choose **Keep Local** to preserve DeckOps settings.
+
+**Plutonium login not persisting across games?**
+Go to **Settings → Sync to All Prefixes** after logging in to copy your credentials to all game prefixes.
 
 ---
 
