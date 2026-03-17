@@ -70,6 +70,10 @@ DeckOps automates the installation of iw4x, CoD4x, IW3SP-MOD, and Plutonium on S
 
 **If Steam asks about cloud saves, choose Keep Local.** DeckOps writes display and controller configs locally - choosing Upload or letting Steam overwrite will undo them.
 
+**When launching Modern Warfare 1 or World at War for the first time after DeckOps install, Steam will ask which mode you want to launch.** Select Singleplayer or Campaign and set it as your default. Multiplayer for these games launches via the DeckOps shortcuts in your library instead.
+
+**Black Ops II graphics settings must be set manually.** BO2 config files are encrypted and cannot be written by DeckOps. Set your resolution and display settings in-game after launching for the first time.
+
 > DeckOps sets GE-Proton as the compatibility tool for all supported games. Other games in your library are not affected.
 
 ---
@@ -119,11 +123,9 @@ Choose **Keep Local** to preserve DeckOps settings.
 
 ## Credits
 
+DeckOps is an installer. The projects below are what actually make it work.
+
 **[PlutoniumAltLauncher](https://github.com/framilano/PlutoniumAltLauncher)** - Original inspiration for DeckOps.
-
----
-
-**DeckOps is an installer. The projects below are what actually make it work.**
 
 **[Plutonium](https://plutonium.pw)** - MW3, World at War, Black Ops, Black Ops II. 💰 [Donate](https://forum.plutonium.pw/donate)
 

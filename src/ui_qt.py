@@ -934,7 +934,7 @@ class ManagementScreen(QWidget):
         title = QLabel("DECKOPS"); title.setFont(font(22, display=True))
         title.setStyleSheet("color:#FFF;background:transparent;")
         hl.addWidget(title); hl.addStretch()
-        guide_btn = _btn("📋  Setup Guide", C_BLUE_BTN, size=11, h=36); guide_btn.setFixedWidth(140)
+        guide_btn = _btn("📋  Guide", C_BLUE_BTN, size=11, h=36); guide_btn.setFixedWidth(100)
         guide_btn.clicked.connect(lambda: self.stack.setCurrentIndex(7))
         hl.addWidget(guide_btn)
         hl.addSpacing(8)
@@ -1069,6 +1069,25 @@ class ControllerInfoScreen(QWidget):
             "Newest GE-Proton installed and set for all games.",
             12, C_DIM, align=Qt.AlignLeft))
 
+        lay.addWidget(_hdiv())
+
+        # ── MW1 / WaW launch mode instruction ─────────────────────────────────
+        lay.addWidget(_lbl("⚠  First Launch - Modern Warfare 1 & World at War", 13, C_TREY, bold=True, align=Qt.AlignLeft))
+        lay.addWidget(_lbl(
+            "When launching either game for the first time, Steam will ask which mode you want to launch. "
+            "Select Singleplayer or Campaign and set it as your default. "
+            "Multiplayer for these games launches via the DeckOps shortcuts in your library instead.",
+            12, C_DIM, align=Qt.AlignLeft))
+
+        lay.addWidget(_hdiv())
+
+        # ── BO2 encrypted config note ──────────────────────────────────────────
+        lay.addWidget(_lbl("⚠  Black Ops II - Manual Setup Required", 13, C_TREY, bold=True, align=Qt.AlignLeft))
+        lay.addWidget(_lbl(
+            "BO2 config files are encrypted and cannot be written by DeckOps. "
+            "Set your resolution and display settings manually in-game after launching for the first time.",
+            12, C_DIM, align=Qt.AlignLeft))
+
         lay.addStretch()
 
         cont = _btn("Continue  >>", C_IW, h=52)
@@ -1138,7 +1157,7 @@ class ConfigureScreen(QWidget):
         lay.addWidget(_lbl("Controller Profiles", 14, "#CCC", align=Qt.AlignLeft))
         cr = QHBoxLayout(); cr.setSpacing(12)
         ctrl_btn  = _btn("Re-apply Templates", C_DARK_BTN, size=12, h=40)
-        guide_btn = _btn("Setup Guide", C_BLUE_BTN, size=12, h=40)
+        guide_btn = _btn("Guide", C_BLUE_BTN, size=12, h=40)
         ctrl_btn.clicked.connect(self._apply_controller_profiles)
         guide_btn.clicked.connect(lambda: self.stack.setCurrentIndex(7))
         cr.addWidget(ctrl_btn); cr.addWidget(guide_btn); cr.addStretch()
