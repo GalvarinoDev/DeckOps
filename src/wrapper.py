@@ -106,31 +106,6 @@ def write_wrapper_script(exe_path, script_content, original_size=None):
              stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
 
-def _find_block_end(text, start):
-    """
-    Brace-depth parser that returns the index of the closing brace of the
-    block opened at `start`. Skips braces inside quoted strings so that
-    bash substitutions (e.g. ${@/iw3sp.exe/iw3sp_mod.exe}) in VDF values
-    are not mistaken for block delimiters.
-    """
-    depth = 0
-    i = start
-    in_quote = False
-    while i < len(text):
-        c = text[i]
-        if c == '"' and (i == 0 or text[i - 1] != '\\'):
-            in_quote = not in_quote
-        elif not in_quote:
-            if c == '{':
-                depth += 1
-            elif c == '}':
-                depth -= 1
-                if depth == 0:
-                    return i
-        i += 1
-    return -1  # malformed
-
-
 def set_launch_options(steam_root, appid, options):
     """
     Set or append launch options for a Steam game in localconfig.vdf.
@@ -177,6 +152,24 @@ def set_launch_options(steam_root, appid, options):
         key_match = key_pattern.search(content)
         if not key_match:
             continue
+
+        def _find_block_end(text, start):
+            depth = 0
+            i = start
+            in_quote = False
+            while i < len(text):
+                c = text[i]
+                if c == '"' and (i == 0 or text[i-1] != '\\'):
+                    in_quote = not in_quote
+                elif not in_quote:
+                    if c == '{':
+                        depth += 1
+                    elif c == '}':
+                        depth -= 1
+                        if depth == 0:
+                            return i
+                i += 1
+            return -1  # malformed
 
         app_open  = key_match.end() - 1
         app_close = _find_block_end(content, app_open)
@@ -304,6 +297,25 @@ def set_steam_input_enabled(steam_root, appids=None):
 
         with open(vdf_path, "r", errors="replace") as f:
             content = f.read()
+
+        def _find_block_end(text, start):
+            """Brace-depth parser that skips braces inside quoted strings."""
+            depth = 0
+            i = start
+            in_quote = False
+            while i < len(text):
+                c = text[i]
+                if c == '"' and (i == 0 or text[i - 1] != '\\'):
+                    in_quote = not in_quote
+                elif not in_quote:
+                    if c == '{':
+                        depth += 1
+                    elif c == '}':
+                        depth -= 1
+                        if depth == 0:
+                            return i
+                i += 1
+            return -1
 
         modified = False
         for appid in appids:
@@ -433,8 +445,18 @@ def set_compat_tool(appids, version):
 
 def set_default_launch_option(steam_root, appids_config):
     """
-    Set the default launch option for games with multiple launch modes,
-    so Steam skips the 'which mode?' dialog.
+    Set the default launch option for games with multiple launch modes so
+    Steam Deck skips the 'which mode?' dialog.
+
+    On SteamOS the picker is controlled by the Deck configurator system, not
+    the standard localconfig.vdf apps block. This function targets the correct
+    Deck-specific location:
+
+      - Writes DefaultLaunchOption into the "apps" block that sits directly
+        after "Deck_ConfiguratorInterstitialApps_AppLauncherInteractionIssues"
+      - Sets "Deck_ConfiguratorInterstitialsCheckbox_AppLauncherInteractionIssues"
+        to "1" so the Deck configurator treats the choice as confirmed and
+        stops showing the picker
 
     appids_config — dict mapping appid to (hash_key, index)
         e.g. {"7940": ("7a722f97", "1"), "10090": ("9aa5e05f", "0")}
@@ -455,52 +477,88 @@ def set_default_launch_option(steam_root, appids_config):
 
         modified = False
 
-        for appid, (hash_key, index) in appids_config.items():
-            # Build the DefaultLaunchOption block
-            entry = (
-                f'\t\t\t\t\t"DefaultLaunchOption"\n'
-                f'\t\t\t\t\t{{\n'
-                f'\t\t\t\t\t\t"{hash_key}"\t\t"{index}"\n'
-                f'\t\t\t\t\t}}\n'
-            )
-
-            # Use brace-depth parser to find the true appid block boundaries.
-            # The regex (.*?) approach is broken — it matches only up to the
-            # first closing brace inside the block, cutting it short and
-            # corrupting adjacent keys on write.
-            key_pattern = re.compile(
-                r'"' + re.escape(appid) + r'"\s*\{',
-                re.IGNORECASE
-            )
-            key_match = key_pattern.search(content)
-            if not key_match:
-                continue
-
-            app_open  = key_match.end() - 1
-            app_close = _find_block_end(content, app_open)
-            if app_close == -1:
-                continue
-
-            app_block = content[app_open + 1:app_close]
-
-            dlo_pattern = re.compile(
-                r'"DefaultLaunchOption"\s*\{[^}]*\}',
-                re.IGNORECASE | re.DOTALL
-            )
-
-            if dlo_pattern.search(app_block):
-                # Replace existing DefaultLaunchOption
-                new_block = dlo_pattern.sub(entry.strip(), app_block)
-            else:
-                # Insert DefaultLaunchOption into existing app block
-                new_block = app_block.rstrip() + '\n' + entry + '\t\t\t\t'
-
-            content = (
-                content[:app_open + 1] +
-                new_block +
-                content[app_close:]
-            )
+        # ── Step 1: set the checkbox to "1" so the Deck configurator treats
+        # the launch choice as confirmed and stops showing the picker ──────────
+        checkbox_pattern = re.compile(
+            r'("Deck_ConfiguratorInterstitialsCheckbox_AppLauncherInteractionIssues"\s*")([^"]*?)(")',
+            re.IGNORECASE
+        )
+        if checkbox_pattern.search(content):
+            content  = checkbox_pattern.sub(r'\g<1>1\g<3>', content)
             modified = True
+
+        # ── Step 2: write DefaultLaunchOption into the Deck configurator's
+        # own "apps" block — this is what the picker actually reads on SteamOS.
+        # The block sits immediately after the InterstitialApps key. ──────────
+        interstitial_pattern = re.compile(
+            r'"Deck_ConfiguratorInterstitialApps_AppLauncherInteractionIssues"\s*"[^"]*"\s*"apps"\s*\{',
+            re.IGNORECASE
+        )
+        interstitial_match = interstitial_pattern.search(content)
+
+        if interstitial_match:
+            apps_open  = interstitial_match.end() - 1
+            apps_close = _find_block_end(content, apps_open)
+            if apps_close != -1:
+                apps_block = content[apps_open + 1:apps_close]
+
+                for appid, (hash_key, index) in appids_config.items():
+                    entry = (
+                        f'\t\t\t\t"{appid}"\n'
+                        f'\t\t\t\t{{\n'
+                        f'\t\t\t\t\t"DefaultLaunchOption"\n'
+                        f'\t\t\t\t\t{{\n'
+                        f'\t\t\t\t\t\t"{hash_key}"\t\t"{index}"\n'
+                        f'\t\t\t\t\t}}\n'
+                        f'\t\t\t\t}}\n'
+                    )
+                    appid_pattern = re.compile(
+                        r'"' + re.escape(appid) + r'"\s*\{',
+                        re.IGNORECASE
+                    )
+                    appid_match = appid_pattern.search(apps_block)
+                    if appid_match:
+                        appid_open  = appid_match.end() - 1
+                        appid_close = _find_block_end(apps_block, appid_open)
+                        if appid_close != -1:
+                            apps_block = (
+                                apps_block[:appid_match.start()] +
+                                entry.strip() +
+                                apps_block[appid_close + 1:]
+                            )
+                    else:
+                        apps_block = apps_block.rstrip() + '\n' + entry
+
+                content = (
+                    content[:apps_open + 1] +
+                    apps_block +
+                    content[apps_close:]
+                )
+                modified = True
+        else:
+            # Deck configurator block doesn't exist yet — build it from scratch
+            # and insert before "LaunchOptionTipsShown" if present
+            deck_block  = '\t\t\t"Deck_ConfiguratorInterstitialsVersionSeen_AppLauncherInteractionIssues"\t\t"1"\n'
+            deck_block += '\t\t\t"Deck_ConfiguratorInterstitialsCheckbox_AppLauncherInteractionIssues"\t\t"1"\n'
+            deck_block += '\t\t\t"Deck_ConfiguratorInterstitialApps_AppLauncherInteractionIssues"\t\t"[' + ','.join(appids_config.keys()) + ']"\n'
+            deck_block += '\t\t\t"apps"\n\t\t\t{\n'
+            for appid, (hash_key, index) in appids_config.items():
+                deck_block += (
+                    f'\t\t\t\t"{appid}"\n'
+                    f'\t\t\t\t{{\n'
+                    f'\t\t\t\t\t"DefaultLaunchOption"\n'
+                    f'\t\t\t\t\t{{\n'
+                    f'\t\t\t\t\t\t"{hash_key}"\t\t"{index}"\n'
+                    f'\t\t\t\t\t}}\n'
+                    f'\t\t\t\t}}\n'
+                )
+            deck_block += '\t\t\t}\n'
+
+            tips_pattern = re.compile(r'"LaunchOptionTipsShown"', re.IGNORECASE)
+            tips_match   = tips_pattern.search(content)
+            if tips_match:
+                content  = content[:tips_match.start()] + deck_block + content[tips_match.start():]
+                modified = True
 
         if modified:
             with open(vdf_path, "w", errors="replace") as f:
