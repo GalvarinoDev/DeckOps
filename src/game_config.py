@@ -6,9 +6,7 @@ into the correct destination paths for each game. Overwrites whatever is
 currently there.
 
 LCD users only receive MW1 and MW2 configs.
-OLED users receive MW1, MW2, WaW, BO1, and MW3 configs.
-
-BO2 configs are not yet available and are skipped silently.
+OLED users receive MW1, MW2, WaW, BO1, MW3, and BO2 configs.
 """
 
 import os
@@ -49,7 +47,7 @@ def _pfx_local(steam_root, appid, *parts):
 # Keys that are absent for a given model are simply not included.
 
 _LCD_KEYS  = {"cod4sp", "cod4mp", "iw4sp", "iw4mp"}
-_OLED_KEYS = {"cod4sp", "cod4mp", "iw4sp", "iw4mp", "t4sp", "t4mp", "t5sp", "t5mp", "iw5sp", "iw5mp"}
+_OLED_KEYS = {"cod4sp", "cod4mp", "iw4sp", "iw4mp", "t4sp", "t4mp", "t5sp", "t5mp", "iw5sp", "iw5mp", "t6zm", "t6mp"}
 
 
 def _build_config_map(steam_root):
@@ -149,6 +147,31 @@ def _build_config_map(steam_root):
                 _pfx_local(
                     steam_root, 42690,
                     "Plutonium", "storage", "iw5", "players"
+                ),
+            ),
+        ],
+
+        # ── BO2 ZM (Plutonium t6, appid 212910) ───────────────────────────────
+        # BO2 uses separate appids for ZM and MP — each has its own compatdata
+        # prefix. ZM lives under appid 212910.
+        "t6zm": [
+            (
+                "BO2/plutonium_zm.cfg",
+                _pfx_local(
+                    steam_root, 212910,
+                    "Plutonium", "storage", "t6", "players"
+                ),
+            ),
+        ],
+
+        # ── BO2 MP (Plutonium t6, appid 202990) ───────────────────────────────
+        # MP lives under its own separate appid 202990.
+        "t6mp": [
+            (
+                "BO2/plutonium_mp.cfg",
+                _pfx_local(
+                    steam_root, 202990,
+                    "Plutonium", "storage", "t6", "players"
                 ),
             ),
         ],
