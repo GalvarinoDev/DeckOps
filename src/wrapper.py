@@ -5,6 +5,33 @@ import shutil
 import subprocess
 
 
+def _find_block_end(text, start):
+    """
+    Brace-depth parser that skips braces inside quoted strings.
+
+    WARNING: Must skip braces inside quoted strings - VDF values like
+    bash substitutions (e.g. ${@/iw3sp.exe/iw3sp_mod.exe}) contain
+    { and } characters that must NOT be counted as block delimiters.
+    Failure to do this will corrupt localconfig.vdf.
+    """
+    depth = 0
+    i = start
+    in_quote = False
+    while i < len(text):
+        c = text[i]
+        if c == '"' and (i == 0 or text[i - 1] != '\\'):
+            in_quote = not in_quote
+        elif not in_quote:
+            if c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+                if depth == 0:
+                    return i
+        i += 1
+    return -1
+
+
 def get_proton_path(steam_root):
     """
     Find the best available Proton binary for running Windows executables.
@@ -153,24 +180,6 @@ def set_launch_options(steam_root, appid, options):
         if not key_match:
             continue
 
-        def _find_block_end(text, start):
-            depth = 0
-            i = start
-            in_quote = False
-            while i < len(text):
-                c = text[i]
-                if c == '"' and (i == 0 or text[i-1] != '\\'):
-                    in_quote = not in_quote
-                elif not in_quote:
-                    if c == '{':
-                        depth += 1
-                    elif c == '}':
-                        depth -= 1
-                        if depth == 0:
-                            return i
-                i += 1
-            return -1  # malformed
-
         app_open  = key_match.end() - 1
         app_close = _find_block_end(content, app_open)
         if app_close == -1:
@@ -297,25 +306,6 @@ def set_steam_input_enabled(steam_root, appids=None):
 
         with open(vdf_path, "r", errors="replace") as f:
             content = f.read()
-
-        def _find_block_end(text, start):
-            """Brace-depth parser that skips braces inside quoted strings."""
-            depth = 0
-            i = start
-            in_quote = False
-            while i < len(text):
-                c = text[i]
-                if c == '"' and (i == 0 or text[i - 1] != '\\'):
-                    in_quote = not in_quote
-                elif not in_quote:
-                    if c == '{':
-                        depth += 1
-                    elif c == '}':
-                        depth -= 1
-                        if depth == 0:
-                            return i
-                i += 1
-            return -1
 
         modified = False
         for appid in appids:

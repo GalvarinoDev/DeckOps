@@ -598,25 +598,6 @@ for f in \
 done
 echo ""
 
-info "Removing DeckOps controller templates from Steam..."
-
-TEMPLATES_DIR="$HOME/.steam/steam/controller_base/templates"
-DECKOPS_TEMPLATES=(
-    "controller_neptune_deckops_hold.vdf"
-    "controller_neptune_deckops_toggle.vdf"
-    "controller_neptune_deckops_other_hold.vdf"
-    "controller_neptune_deckops_other_toggle.vdf"
-)
-
-for tpl in "${DECKOPS_TEMPLATES[@]}"; do
-    if [ -f "$TEMPLATES_DIR/$tpl" ]; then
-        rm -f "$TEMPLATES_DIR/$tpl" && success "Removed $tpl" || warn "Failed to remove $tpl"
-    else
-        skip "$tpl not found"
-    fi
-done
-echo ""
-
 info "Removing per-game controller configs..."
 
 python3 - << 'PYEOF'
