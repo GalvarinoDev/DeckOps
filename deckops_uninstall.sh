@@ -329,7 +329,7 @@ if [ -n "$STEAM_ROOT" ]; then
         skip "compatdata directory not found"
     fi
 
-    for appid in 42690 10090 42700 202990; do
+    for appid in 42690 10090 42700 202990 212910; do
         game_dir=$(find_install_dir "$appid") || true
         if [ -n "$game_dir" ] && [ -f "$game_dir/deckops_plutonium.json" ]; then
             rm -f "$game_dir/deckops_plutonium.json" && success "Removed DeckOps metadata for appid $appid" || warn "Failed to remove metadata for appid $appid"
@@ -588,7 +588,8 @@ for f in \
     "controller_neptune_deckops_toggle.vdf" \
     "controller_neptune_deckops_other_hold.vdf" \
     "controller_neptune_deckops_other_toggle.vdf" \
-    "controller_neptune_deckops_other.vdf"; do
+    "controller_neptune_deckops_bo2_hold.vdf" \
+    "controller_neptune_deckops_bo2_toggle.vdf"; do
     target="$TEMPLATE_DIR/$f"
     if [ -f "$target" ]; then
         rm -f "$target" && success "Removed $f" || warn "Failed to remove $f"
