@@ -634,8 +634,7 @@ MANAGED_STEAM_APPIDS = [
 
 # Named game keys used in configset files — must match controller_profiles.py
 APPID_NAMED_KEYS = {
-    "7940":   ["call of duty 4 modern warfare (2007)",
-               "call of duty 4 modern warfare - multiplayer"],
+    "7940":   ["call of duty 4 modern warfare (2007)"],
     "10090":  ["call of duty world at war",
                "call of duty world at war - multiplayer"],
     "10180":  ["call of duty modern warfare 2 (2009) - multiplayer"],

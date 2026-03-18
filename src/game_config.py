@@ -185,10 +185,16 @@ def apply_game_configs(selected_keys, installed_games, steam_root,
     steam_root      — path to Steam root
     deck_model      — 'oled' or 'lcd'
     on_progress     — optional callback(msg: str)
+
+    Returns (applied, skipped, failed) counts.
     """
     def prog(msg):
         if on_progress:
             on_progress(msg)
+
+    applied  = 0
+    skipped  = 0
+    failed   = 0
 
     model_dir   = "OLED" if deck_model == "oled" else "LCD"
     allowed_keys = _OLED_KEYS if deck_model == "oled" else _LCD_KEYS
@@ -199,6 +205,7 @@ def apply_game_configs(selected_keys, installed_games, steam_root,
             continue
         if key not in config_map:
             prog(f"  - {key}: no config available yet, skipping")
+            skipped += 1
             continue
 
         game       = installed_games.get(key, {})
@@ -209,6 +216,7 @@ def apply_game_configs(selected_keys, installed_games, steam_root,
 
             if not os.path.exists(src):
                 prog(f"  - {key}: asset not found ({asset_subpath}), skipping")
+                skipped += 1
                 continue
 
             # Resolve destination directory
@@ -217,10 +225,12 @@ def apply_game_configs(selected_keys, installed_games, steam_root,
             else:
                 if not install_dir:
                     prog(f"  - {key}: install_dir unknown, skipping")
+                    skipped += 1
                     continue
                 dest_dir = _dest_from_install(key, install_dir)
                 if not dest_dir:
                     prog(f"  - {key}: could not resolve destination, skipping")
+                    skipped += 1
                     continue
 
             os.makedirs(dest_dir, exist_ok=True)
@@ -229,7 +239,10 @@ def apply_game_configs(selected_keys, installed_games, steam_root,
             try:
                 shutil.copy2(src, dest)
                 prog(f"  + {key}: {os.path.basename(src)} -> {dest_dir}")
+                applied += 1
             except Exception as ex:
                 prog(f"  - {key}: failed to copy {os.path.basename(src)}: {ex}")
+                failed += 1
 
-    prog("Game configs applied.")
+    prog(f"Game configs: {applied} applied, {skipped} skipped, {failed} failed.")
+    return applied, skipped, failed

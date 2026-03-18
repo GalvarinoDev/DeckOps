@@ -747,14 +747,21 @@ class InstallScreen(QWidget):
         # ── game display configs ──────────────────────────────────────────────
         try:
             from game_config import apply_game_configs
-            apply_game_configs(
+            applied, skipped, failed = apply_game_configs(
                 selected_keys=selected_keys,
                 installed_games={k: g for k, gd, g in self.selected if g},
                 steam_root=self.steam_root,
                 deck_model=cfg.get_deck_model() or "oled",
                 on_progress=lambda msg: self._s.log.emit(msg),
             )
-            self._s.log.emit("✓  Game display configs written")
+            if applied > 0:
+                self._s.log.emit(f"✓  Game display configs: {applied} written"
+                                 + (f", {skipped} skipped" if skipped else "")
+                                 + (f", {failed} failed" if failed else ""))
+            elif skipped > 0:
+                self._s.log.emit(f"⚠  Game display configs: none applied ({skipped} skipped)")
+            else:
+                self._s.log.emit("⚠  Game display configs: no eligible configs found")
         except Exception as ex:
             self._s.log.emit(f"  Game configs skipped: {ex}")
 
