@@ -163,21 +163,6 @@ def install_iw4x(game: dict, steam_root: str,
     if errors:
         raise RuntimeError("iwd download failed:\n" + "\n".join(errors))
 
-    # Set Steam launch option directly — no shell script or xterm needed.
-    # Must be called after kill_steam() so localconfig.vdf is not overwritten
-    # by Steam's cloud sync after we write it.
-    prog(92, "Setting Steam launch option...")
-    try:
-        from wrapper import set_launch_options
-        set_launch_options(
-            steam_root,
-            "10190",
-            "bash -c 'exec \"${@/iw4mp.exe/iw4x.exe}\"' -- %command%",
-        )
-        prog(94, "  ✓ Launch option set.")
-    except Exception as ex:
-        prog(92, f"Warning: could not set launch option: {ex}")
-
     prog(100, "IW4x installation complete!")
 
 
