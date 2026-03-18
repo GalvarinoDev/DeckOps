@@ -746,17 +746,14 @@ class InstallScreen(QWidget):
 
         # ── game display configs ──────────────────────────────────────────────
         try:
-            from game_config import write_game_configs, write_bo2_config
-            compatdata_root = os.path.join(
-                os.path.expanduser("~"),
-                ".local/share/Steam/steamapps/compatdata"
+            from game_config import apply_game_configs
+            apply_game_configs(
+                selected_keys=selected_keys,
+                installed_games={k: g for k, gd, g in self.selected if g},
+                steam_root=self.steam_root,
+                deck_model=cfg.get_deck_model() or "oled",
+                on_progress=lambda msg: self._s.log.emit(msg),
             )
-            for key, gd, game in self.selected:
-                install_dir = game.get("install_dir", "")
-                if key in ("t6mp", "t6zm"):
-                    write_bo2_config(key, compatdata_root)
-                elif install_dir:
-                    write_game_configs(key, install_dir)
             self._s.log.emit("✓  Game display configs written")
         except Exception as ex:
             self._s.log.emit(f"  Game configs skipped: {ex}")
