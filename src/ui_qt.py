@@ -700,7 +700,7 @@ class InstallScreen(QWidget):
                 self._plut_event.wait()
                 self._s.plut_go.emit()
 
-        # ── Write launch options before killing Steam so they sync to cloud ──
+        # ── Write launch options before kill so they sync to cloud on shutdown ─
         _write_launch_options()
 
         # ── Kill Steam once — everything from here runs with Steam closed ─────
@@ -708,7 +708,7 @@ class InstallScreen(QWidget):
         _apply_compat()
         _set_launch_defaults()
 
-        # ── Write launch options again now Steam is fully closed ───────────────
+        # ── Write launch options again — local file, Steam fully dead ─────────
         _write_launch_options()
 
         # ── Plutonium games ───────────────────────────────────────────────────
@@ -970,10 +970,6 @@ class ManagementScreen(QWidget):
         title = QLabel("DECKOPS"); title.setFont(font(22, display=True))
         title.setStyleSheet("color:#FFF;background:transparent;")
         hl.addWidget(title); hl.addStretch()
-        mode_btn = _btn("🎮  Mode", "#2A7A2A", size=11, h=36); mode_btn.setFixedWidth(100)
-        mode_btn.clicked.connect(self._switch_to_game_mode)
-        hl.addWidget(mode_btn)
-        hl.addSpacing(8)
         guide_btn = _btn("📋  Guide", C_BLUE_BTN, size=11, h=36); guide_btn.setFixedWidth(100)
         guide_btn.clicked.connect(lambda: self.stack.setCurrentIndex(7))
         hl.addWidget(guide_btn)
@@ -1049,19 +1045,6 @@ class ManagementScreen(QWidget):
         s.steam_root = root
         self.stack.setCurrentIndex(8)
 
-    def _switch_to_game_mode(self):
-        shortcut = os.path.expanduser("~/Desktop/Return.desktop")
-        try:
-            subprocess.Popen(["xdg-open", shortcut], start_new_session=True)
-        except Exception:
-            try:
-                subprocess.Popen(["steamos-session-select", "gamepadui"], start_new_session=True)
-            except Exception:
-                try:
-                    subprocess.Popen(["qdbus", "org.kde.Shutdown", "/Shutdown", "org.kde.Shutdown.logout"], start_new_session=True)
-                except Exception:
-                    pass
-
     def _reinstall(self, gd, keys):
         root = find_steam_root()
         inst = find_installed_games(parse_library_folders(root))
@@ -1136,8 +1119,8 @@ class ControllerInfoScreen(QWidget):
 
         lay.addStretch()
 
-        cont = _btn("Continue  >>", C_IW, h=52)
-        cont.clicked.connect(self._go_management)
+        cont = _btn("Launch Steam  >>", C_IW, h=52)
+        cont.clicked.connect(self._launch_steam)
         cw = QHBoxLayout(); cw.addStretch(); cw.addWidget(cont, stretch=1); cw.addStretch()
         lay.addLayout(cw)
 
@@ -1149,7 +1132,16 @@ class ControllerInfoScreen(QWidget):
             f"Standard gamepad layout with gyro aiming ({gyro_desc}) assigned to all games."
         )
 
-    def _go_management(self):
+    def _launch_steam(self):
+        try:
+            steam_root = cfg.load().get("steam_root", "") or find_steam_root()
+            steam_sh = os.path.join(steam_root, "steam.sh") if steam_root else None
+            if steam_sh and os.path.exists(steam_sh):
+                subprocess.Popen([steam_sh], start_new_session=True)
+            else:
+                subprocess.Popen(["steam"], start_new_session=True)
+        except Exception:
+            pass
         root = find_steam_root()
         self.stack.widget(5).set_installed(find_installed_games(parse_library_folders(root)))
         self.stack.setCurrentIndex(5)
