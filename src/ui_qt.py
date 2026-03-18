@@ -1062,7 +1062,7 @@ class ManagementScreen(QWidget):
 class ControllerInfoScreen(QWidget):
     def __init__(self, stack):
         super().__init__(); self.stack = stack
-        lay = QVBoxLayout(self); lay.setContentsMargins(60,40,60,40); lay.setSpacing(14)
+        lay = QVBoxLayout(self); lay.setContentsMargins(60,30,60,30); lay.setSpacing(8)
 
         t = QLabel("SETUP COMPLETE"); t.setFont(font(32, True)); t.setAlignment(Qt.AlignCenter)
         t.setStyleSheet("color:#FFF;background:transparent;"); lay.addWidget(t)
@@ -1075,48 +1075,46 @@ class ControllerInfoScreen(QWidget):
         # ── Warning box ────────────────────────────────────────────────────────
         lay.addWidget(_lbl("⚠  Do This Before Anything Else", 13, C_TREY, bold=True, align=Qt.AlignLeft))
         lay.addWidget(_lbl(
-            "Steam will launch automatically — ignore it and switch back to Game Mode. "
-            "Do not use Steam in Desktop Mode until you have launched every modded game at least once in Game Mode. "
-            "Steam Cloud will overwrite your DeckOps setup if you interact with it in Desktop Mode first, "
-            "which would require a full uninstall and reinstall. "
-            "Once every modded game has been launched in Game Mode at least once, it is safe to use Steam in Desktop Mode.",
-            12, C_DIM, align=Qt.AlignLeft))
-        lay.addSpacing(6)
+            "Steam will launch automatically, ignore it and return to Game Mode. "
+            "Do not use Steam in Desktop Mode until every modded game has been launched at least once, "
+            "especially MW1 (Singleplayer) and MW2 (Multiplayer). "
+            "Steam Cloud will overwrite your setup, requiring a full reinstall.",
+            11, C_DIM, align=Qt.AlignLeft))
         lay.addWidget(_lbl(
-            "If Steam asks about cloud saves, choose Keep Local.  "
+            "If Steam asks about cloud saves, choose Keep Local. "
             "If a game asks for Safe Mode, choose No.",
-            12, C_DIM, align=Qt.AlignLeft))
+            11, C_DIM, align=Qt.AlignLeft))
+        lay.addWidget(_hdiv())
+
+        # ── MW1 / WaW launch mode instruction ─────────────────────────────────
+        lay.addWidget(_lbl("🎮  First Launch - Modern Warfare 1 & World at War", 13, C_IW, bold=True, align=Qt.AlignLeft))
+        lay.addWidget(_lbl(
+            "When launching either game for the first time, Steam will ask which mode you want to launch. "
+            "Select Singleplayer or Campaign and set it as your default. "
+            "Multiplayer for these games launches via the DeckOps shortcuts in your library instead.",
+            11, C_DIM, align=Qt.AlignLeft))
+
+        lay.addWidget(_hdiv())
+
+        # ── BO2 encrypted config note ──────────────────────────────────────────
+        lay.addWidget(_lbl("⚠  Black Ops II - Manual Setup Required", 13, C_TREY, bold=True, align=Qt.AlignLeft))
+        lay.addWidget(_lbl(
+            "BO2 config files are encrypted and cannot be written by DeckOps. "
+            "Set your resolution and display settings manually in-game after launching for the first time.",
+            11, C_DIM, align=Qt.AlignLeft))
+
         lay.addWidget(_hdiv())
 
         # ── Controller Profiles & GE-Proton ───────────────────────────────────
         lay.addWidget(_lbl("🎮  Controller Profiles & GE-Proton", 13, C_IW, bold=True, align=Qt.AlignLeft))
         # gyro_desc is set dynamically in showEvent so it always reflects the
         # user's actual choice, not whatever was in config at construction time.
-        self._gyro_lbl = _lbl("", 12, C_DIM, align=Qt.AlignLeft)
+        self._gyro_lbl = _lbl("", 11, C_DIM, align=Qt.AlignLeft)
         lay.addWidget(self._gyro_lbl)
         lay.addWidget(_lbl(
             "Newest GE-Proton installed and set for all games. "
             "Change Hold / Toggle anytime in Settings -> Re-apply Controller Profiles.",
             11, "#666", align=Qt.AlignLeft))
-
-        lay.addWidget(_hdiv())
-
-        # ── MW1 / WaW launch mode instruction ─────────────────────────────────
-        lay.addWidget(_lbl("⚠  First Launch - Modern Warfare 1 & World at War", 13, C_TREY, bold=True, align=Qt.AlignLeft))
-        lay.addWidget(_lbl(
-            "When launching either game for the first time, Steam will ask which mode you want to launch. "
-            "Select Singleplayer or Campaign and set it as your default. "
-            "Multiplayer for these games launches via the DeckOps shortcuts in your library instead.",
-            12, C_DIM, align=Qt.AlignLeft))
-
-        lay.addWidget(_hdiv())
-
-        # ── BO2 encrypted config note ──────────────────────────────────────────
-        lay.addWidget(_lbl("🎮  Black Ops II - Manual Setup Required", 13, C_IW, bold=True, align=Qt.AlignLeft))
-        lay.addWidget(_lbl(
-            "BO2 config files are encrypted and cannot be written by DeckOps. "
-            "Set your resolution and display settings manually in-game after launching for the first time.",
-            12, C_DIM, align=Qt.AlignLeft))
 
         lay.addStretch()
 
