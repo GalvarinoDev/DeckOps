@@ -20,7 +20,7 @@ DeckOps automates the installation of iw4x, CoD4x, IW3SP-MOD, and Plutonium on S
 
 2. Open a browser and navigate to this GitHub page
 
-3. Download the **[DeckOps file](https://github.com/GalvarinoDev/DeckOps/releases/download/v1/DeckOps.desktop.download)**
+3. Download the **[DeckOps file](https://github.com/GalvarinoDev/DeckOps/releases/download/v1/DeckOps.desktop)**
 
 4. Right-click the file -> **Properties** -> **Permissions** -> tick **"Is executable"** -> OK
 
