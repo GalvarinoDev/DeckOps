@@ -1024,13 +1024,17 @@ class ManagementScreen(QWidget):
         self.stack.setCurrentIndex(8)
 
     def _switch_to_game_mode(self):
+        shortcut = os.path.expanduser("~/Desktop/Return to Gaming Mode.desktop")
         try:
-            subprocess.Popen(["steamos-session-select", "gamepadui"], start_new_session=True)
+            subprocess.Popen(["xdg-open", shortcut], start_new_session=True)
         except Exception:
             try:
-                subprocess.Popen(["qdbus", "org.kde.Shutdown", "/Shutdown", "logout"], start_new_session=True)
+                subprocess.Popen(["steamos-session-select", "gamepadui"], start_new_session=True)
             except Exception:
-                pass
+                try:
+                    subprocess.Popen(["qdbus", "org.kde.Shutdown", "/Shutdown", "org.kde.Shutdown.logout"], start_new_session=True)
+                except Exception:
+                    pass
 
     def _reinstall(self, gd, keys):
         root = find_steam_root()
