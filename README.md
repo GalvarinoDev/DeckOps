@@ -16,17 +16,19 @@ DeckOps automates the installation of iw4x, CoD4x, IW3SP-MOD, and Plutonium on S
 
 ## 🎮 Supported Games
 
-| Game | Modes | Client | Deck Model | Controller | Aim Assist | Gyro |
-|---|---|---|---|---|---|---|
-| Modern Warfare 1 | SP | IW3SP-MOD | LCD + OLED | ✅ | ✅ | ✅ |
-| Modern Warfare 1 | MP | CoD4x | LCD + OLED | ✅ | ❌ | ✅ |
-| Modern Warfare 2 | MP | iw4x | LCD + OLED | ✅ | ✅ | ✅ |
-| Modern Warfare 3 | MP | Plutonium | OLED only | ✅ | ✅ | ✅ |
-| World at War | SP / MP / ZM | Plutonium | OLED only | ✅ | ✅ | ✅ |
-| Black Ops | SP / MP / ZM | Plutonium | OLED only | ✅ | ✅ | ✅ |
-| Black Ops II | MP / ZM | Plutonium | OLED only | ✅ | ✅ | ✅ |
+| Game | Modes | Client | Deck Model | Controller | Aim Assist | Gyro | Launch First |
+|---|---|---|---|---|---|---|---|
+| Modern Warfare 1 | SP | IW3SP-MOD | LCD + OLED | ✅ | ✅ | ✅ | SP |
+| Modern Warfare 1 | MP | CoD4x | LCD + OLED | ✅ | ❌ | ✅ | MP |
+| Modern Warfare 2 | MP | iw4x | LCD + OLED | ✅ | ✅ | ✅ | MP |
+| Modern Warfare 3 | MP | Plutonium | OLED only | ✅ | ✅ | ✅ | MP |
+| World at War | SP / MP / ZM | Plutonium | OLED only | ✅ | ✅ | ✅ | SP + MP |
+| Black Ops | SP / MP / ZM | Plutonium | OLED only | ✅ | ✅ | ✅ | SP + MP |
+| Black Ops II | MP / ZM | Plutonium | OLED only | ✅ | ✅ | ✅ | MP + Zombies |
 
 > All titles support controller and gyro via Steam Input. Choose **Hold** (R5 held) or **Toggle** (R5 press) during setup. Aim assist is not available for Steam-native modes (MW2 SP, MW3 SP, BO2 SP) yet.
+
+> **Black Ops II MP and Zombies** use a dedicated controller layout that does not support dual input - gyro feel may differ from other titles.
 
 > **Steam Deck LCD:** Plutonium online servers require OLED. For offline Campaign and Zombies on LCD, see [PlutoniumAltLauncher](https://github.com/framilano/PlutoniumAltLauncher).
 
@@ -42,8 +44,6 @@ DeckOps automates the installation of iw4x, CoD4x, IW3SP-MOD, and Plutonium on S
    - **First time:** DeckOps installs automatically
    - **Already installed:** A menu appears - choose to Launch, Reinstall, or Uninstall
 
-> Keep the DeckOps file on your Deck. Double-clicking it is how you launch, reinstall, or uninstall DeckOps in the future.
-
 > Your Steam games are never touched. Only files created by DeckOps are removed during uninstall.
 
 ---
@@ -52,24 +52,16 @@ DeckOps automates the installation of iw4x, CoD4x, IW3SP-MOD, and Plutonium on S
 
 Plutonium games require a free account at [plutonium.pw](https://plutonium.pw). Each game must also be launched through Steam in the correct modes before running DeckOps. This creates the Proton prefix and starts shader cache downloads. Skipping this is the most common cause of install failures.
 
-| Game | Launch these modes in Steam first |
-|---|---|
-| Call of Duty 4 | Multiplayer **and** Singleplayer |
-| Modern Warfare 2 | Multiplayer |
-| Modern Warfare 3 | Multiplayer |
-| World at War | Campaign **and** Multiplayer |
-| Black Ops | Campaign **and** Multiplayer |
-| Black Ops II | Multiplayer **and** Zombies |
-
 ---
 
 ## ⚠️ After Installation
 
-**Steam will launch automatically - ignore it and return to Game Mode.** Do not open Steam in Desktop Mode until every modded game has been launched at least once in Game Mode or Steam Cloud will overwrite your setup. If asked about cloud saves choose **Keep Local**, Safe Mode choose **No**.
+**Steam will launch automatically - ignore it and return to Game Mode.** Do not open Steam in Desktop Mode until every modded game has been launched at least once in Game Mode, or Steam Cloud will overwrite your setup.
 
-**MW1 MP may need three Steam launches to finish setup.**
+If asked about cloud saves choose **Keep Local**. If asked about Safe Mode choose **No**.
 
-**BO2 display settings must be set manually in-game.**
+- **MW1 MP** requires two Steam launches to finish setup, then runs normally on the third.
+- **BO2** display settings must be set manually in-game. MP and Zombies configs are written automatically - Singleplayer is encrypted and cannot be set by DeckOps.
 
 ---
 
@@ -78,8 +70,6 @@ Plutonium games require a free account at [plutonium.pw](https://plutonium.pw). 
 **[PlutoniumAltLauncher](https://github.com/framilano/PlutoniumAltLauncher)** - Original inspiration for DeckOps.
 
 ---
-
-**DeckOps is an installer. The projects below are what actually make it work.**
 
 **[Plutonium](https://plutonium.pw)** - MW3, World at War, Black Ops, Black Ops II. 💰 [Donate](https://forum.plutonium.pw/donate)
 
