@@ -1024,7 +1024,7 @@ class ManagementScreen(QWidget):
         self.stack.setCurrentIndex(8)
 
     def _switch_to_game_mode(self):
-        shortcut = os.path.expanduser("~/Desktop/Return to Gaming Mode.desktop")
+        shortcut = os.path.expanduser("~/Desktop/Return.desktop")
         try:
             subprocess.Popen(["xdg-open", shortcut], start_new_session=True)
         except Exception:
