@@ -1075,9 +1075,10 @@ class ControllerInfoScreen(QWidget):
         # ── Warning box ────────────────────────────────────────────────────────
         lay.addWidget(_lbl("⚠  Do This Before Anything Else", 13, C_TREY, bold=True, align=Qt.AlignLeft))
         lay.addWidget(_lbl(
-            "Do not open Steam in Desktop Mode. Switch to Game Mode and launch every modded game at least once. "
-            "Steam Cloud will overwrite your DeckOps setup if you open Steam while in Desktop Mode, "
-            "which will require you to uninstall DeckOps and reinstall. "
+            "Steam will launch automatically — ignore it and switch back to Game Mode. "
+            "Do not use Steam in Desktop Mode until you have launched every modded game at least once in Game Mode. "
+            "Steam Cloud will overwrite your DeckOps setup if you interact with it in Desktop Mode first, "
+            "which would require a full uninstall and reinstall. "
             "Once every modded game has been launched in Game Mode at least once, it is safe to use Steam in Desktop Mode.",
             12, C_DIM, align=Qt.AlignLeft))
         lay.addSpacing(6)
@@ -1119,7 +1120,7 @@ class ControllerInfoScreen(QWidget):
 
         lay.addStretch()
 
-        cont = _btn("Launch Steam  >>", C_IW, h=52)
+        cont = _btn("Continue  >>", C_IW, h=52)
         cont.clicked.connect(self._launch_steam)
         cw = QHBoxLayout(); cw.addStretch(); cw.addWidget(cont, stretch=1); cw.addStretch()
         lay.addLayout(cw)
