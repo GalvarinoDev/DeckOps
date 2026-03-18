@@ -1025,9 +1025,12 @@ class ManagementScreen(QWidget):
 
     def _switch_to_game_mode(self):
         try:
-            subprocess.Popen(["steamos-session-select", "gamemode"], start_new_session=True)
+            subprocess.Popen(["steamos-session-select", "gamepadui"], start_new_session=True)
         except Exception:
-            pass
+            try:
+                subprocess.Popen(["qdbus", "org.kde.Shutdown", "/Shutdown", "logout"], start_new_session=True)
+            except Exception:
+                pass
 
     def _reinstall(self, gd, keys):
         root = find_steam_root()
@@ -1071,25 +1074,16 @@ class ControllerInfoScreen(QWidget):
             12, C_DIM, align=Qt.AlignLeft))
         lay.addWidget(_hdiv())
 
-        # ── Controller profiles section ────────────────────────────────────────
-        lay.addWidget(_lbl("✓  Controller Profiles", 13, C_IW, bold=True, align=Qt.AlignLeft))
-
+        # ── Controller Profiles & GE-Proton ───────────────────────────────────
+        lay.addWidget(_lbl("🎮  Controller Profiles & GE-Proton", 13, C_IW, bold=True, align=Qt.AlignLeft))
         # gyro_desc is set dynamically in showEvent so it always reflects the
         # user's actual choice, not whatever was in config at construction time.
         self._gyro_lbl = _lbl("", 12, C_DIM, align=Qt.AlignLeft)
         lay.addWidget(self._gyro_lbl)
-
         lay.addWidget(_lbl(
+            "Newest GE-Proton installed and set for all games. "
             "Change Hold / Toggle anytime in Settings -> Re-apply Controller Profiles.",
             11, "#666", align=Qt.AlignLeft))
-
-        lay.addWidget(_hdiv())
-
-        # ── GE-Proton section ──────────────────────────────────────────────────
-        lay.addWidget(_lbl("✓  GE-Proton", 13, C_IW, bold=True, align=Qt.AlignLeft))
-        lay.addWidget(_lbl(
-            "Newest GE-Proton installed and set for all games.",
-            12, C_DIM, align=Qt.AlignLeft))
 
         lay.addWidget(_hdiv())
 
@@ -1104,7 +1098,7 @@ class ControllerInfoScreen(QWidget):
         lay.addWidget(_hdiv())
 
         # ── BO2 encrypted config note ──────────────────────────────────────────
-        lay.addWidget(_lbl("⚠  Black Ops II - Manual Setup Required", 13, C_TREY, bold=True, align=Qt.AlignLeft))
+        lay.addWidget(_lbl("🎮  Black Ops II - Manual Setup Required", 13, C_IW, bold=True, align=Qt.AlignLeft))
         lay.addWidget(_lbl(
             "BO2 config files are encrypted and cannot be written by DeckOps. "
             "Set your resolution and display settings manually in-game after launching for the first time.",
