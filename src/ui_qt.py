@@ -607,6 +607,26 @@ class InstallScreen(QWidget):
                 except Exception as ex:
                     self._s.log.emit(f"  CompatToolMapping skipped: {ex}")
 
+        def _write_launch_options():
+            try:
+                from wrapper import set_launch_options
+                if has_iw4x:
+                    set_launch_options(
+                        self.steam_root,
+                        "10190",
+                        "bash -c 'exec \"${@/iw4mp.exe/iw4x.exe}\"' -- %command%",
+                    )
+                    self._s.log.emit("✓  MW2 launch option written")
+                if has_cod4:
+                    set_launch_options(
+                        self.steam_root,
+                        "7940",
+                        "bash -c 'exec \"${@/iw3sp.exe/iw3sp_mod.exe}\"' -- %command%",
+                    )
+                    self._s.log.emit("✓  CoD4 SP launch option written")
+            except Exception as ex:
+                self._s.log.emit(f"  Launch options skipped: {ex}")
+
         _launch_defaults_set = False
         def _set_launch_defaults():
             nonlocal _launch_defaults_set
@@ -680,10 +700,16 @@ class InstallScreen(QWidget):
                 self._plut_event.wait()
                 self._s.plut_go.emit()
 
+        # ── Write launch options before killing Steam so they sync to cloud ──
+        _write_launch_options()
+
         # ── Kill Steam once — everything from here runs with Steam closed ─────
         _kill_steam_once()
         _apply_compat()
         _set_launch_defaults()
+
+        # ── Write launch options again now Steam is fully closed ───────────────
+        _write_launch_options()
 
         # ── Plutonium games ───────────────────────────────────────────────────
         if has_plut:

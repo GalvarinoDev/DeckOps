@@ -104,21 +104,6 @@ def install_iw3sp(game: dict, steam_root: str,
     with open(meta_path, "w") as f:
         json.dump({"version": "4.1.5"}, f, indent=2)
 
-    # Set Steam launch option directly — no shell script or xterm needed.
-    # Must be called after kill_steam() so localconfig.vdf is not overwritten
-    # by Steam's cloud sync after we write it.
-    prog(90, "Setting Steam launch option...")
-    try:
-        from wrapper import set_launch_options
-        set_launch_options(
-            steam_root,
-            "7940",
-            "bash -c 'exec \"${@/iw3sp.exe/iw3sp_mod.exe}\"' -- %command%",
-        )
-        prog(92, "  ✓ Launch option set.")
-    except Exception as ex:
-        prog(90, f"Warning: could not set launch option: {ex}")
-
     prog(100, "IW3SP-MOD installation complete!")
 
 
