@@ -531,6 +531,12 @@ class InstallScreen(QWidget):
         pw = QHBoxLayout(); pw.addStretch(); pw.addWidget(self.plut_btn); pw.addStretch()
         lay.addLayout(pw)
 
+        self.cont_btn = _btn("Continue  >>", C_IW, size=13, h=52)
+        self.cont_btn.setFixedWidth(320); self.cont_btn.setVisible(False)
+        self.cont_btn.clicked.connect(lambda: self.stack.setCurrentIndex(7))
+        cw = QHBoxLayout(); cw.addStretch(); cw.addWidget(self.cont_btn); cw.addStretch()
+        lay.addLayout(cw)
+
         self._s = _Sigs()
         self._s.progress.connect(lambda p,m: (self.bar.setValue(p), self.cur.setText(m)))
         self._s.log.connect(self._append_log)
@@ -554,7 +560,7 @@ class InstallScreen(QWidget):
 
     def _on_done(self, _):
         self.cur.setText("Installation complete!")
-        QTimer.singleShot(1200, lambda: self.stack.setCurrentIndex(7))
+        self.cont_btn.setVisible(True)
 
     def _go_management(self):
         root = find_steam_root()
@@ -938,6 +944,10 @@ class ManagementScreen(QWidget):
         title = QLabel("DECKOPS"); title.setFont(font(22, display=True))
         title.setStyleSheet("color:#FFF;background:transparent;")
         hl.addWidget(title); hl.addStretch()
+        mode_btn = _btn("🎮  Mode", "#2A7A2A", size=11, h=36); mode_btn.setFixedWidth(100)
+        mode_btn.clicked.connect(self._switch_to_game_mode)
+        hl.addWidget(mode_btn)
+        hl.addSpacing(8)
         guide_btn = _btn("📋  Guide", C_BLUE_BTN, size=11, h=36); guide_btn.setFixedWidth(100)
         guide_btn.clicked.connect(lambda: self.stack.setCurrentIndex(7))
         hl.addWidget(guide_btn)
@@ -1013,6 +1023,12 @@ class ManagementScreen(QWidget):
         s.steam_root = root
         self.stack.setCurrentIndex(8)
 
+    def _switch_to_game_mode(self):
+        try:
+            subprocess.Popen(["steamos-session-select", "gamemode"], start_new_session=True)
+        except Exception:
+            pass
+
     def _reinstall(self, gd, keys):
         root = find_steam_root()
         inst = find_installed_games(parse_library_folders(root))
@@ -1041,9 +1057,17 @@ class ControllerInfoScreen(QWidget):
         lay.addWidget(_hdiv())
 
         # ── Warning box ────────────────────────────────────────────────────────
-        lay.addWidget(_lbl("⚠  Important - Cloud Saves & Safe Mode", 13, C_TREY, bold=True, align=Qt.AlignLeft))
+        lay.addWidget(_lbl("⚠  Do This Before Anything Else", 13, C_TREY, bold=True, align=Qt.AlignLeft))
         lay.addWidget(_lbl(
-            "If Steam asks about cloud saves, choose Keep Local. If a game asks for Safe Mode, choose No.",
+            "Do not open Steam in Desktop Mode. Switch to Game Mode and launch every modded game at least once. "
+            "Steam Cloud will overwrite your DeckOps setup if you open Steam while in Desktop Mode, "
+            "which will require you to uninstall DeckOps and reinstall. "
+            "Once every modded game has been launched in Game Mode at least once, it is safe to use Steam in Desktop Mode.",
+            12, C_DIM, align=Qt.AlignLeft))
+        lay.addSpacing(6)
+        lay.addWidget(_lbl(
+            "If Steam asks about cloud saves, choose Keep Local.  "
+            "If a game asks for Safe Mode, choose No.",
             12, C_DIM, align=Qt.AlignLeft))
         lay.addWidget(_hdiv())
 
@@ -1089,7 +1113,7 @@ class ControllerInfoScreen(QWidget):
         lay.addStretch()
 
         cont = _btn("Continue  >>", C_IW, h=52)
-        cont.clicked.connect(self._launch_steam_and_continue)
+        cont.clicked.connect(self._go_management)
         cw = QHBoxLayout(); cw.addStretch(); cw.addWidget(cont, stretch=1); cw.addStretch()
         lay.addLayout(cw)
 
@@ -1100,17 +1124,6 @@ class ControllerInfoScreen(QWidget):
         self._gyro_lbl.setText(
             f"Standard gamepad layout with gyro aiming ({gyro_desc}) assigned to all games."
         )
-
-    def _launch_steam_and_continue(self):
-        # Launch Steam in background — launch options were already written
-        # during install via set_launch_options() in iw3sp.py / iw4x.py.
-        # Do NOT re-run them here: Steam's cloud sync runs on startup and
-        # would overwrite localconfig.vdf immediately after any write we do.
-        try:
-            subprocess.Popen(["steam"], start_new_session=True)
-        except Exception:
-            pass
-        self._go_management()
 
     def _go_management(self):
         root = find_steam_root()
