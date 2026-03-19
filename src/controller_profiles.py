@@ -1,7 +1,7 @@
 """
 controller_profiles.py - DeckOps controller template installer
 
-Copies the four bundled Neptune controller templates from assets/controllers/
+Copies the bundled Neptune controller templates from assets/controllers/
 into Steam's controller_base/templates/ directory so they are available
 globally across all games without any per-game or per-account setup.
 
@@ -14,6 +14,8 @@ Templates:
     controller_neptune_deckops_toggle.vdf        — R5 toggles gyro on/off
     controller_neptune_deckops_other_hold.vdf    — KB+M with R5 hold gyro
     controller_neptune_deckops_other_toggle.vdf  — KB+M with R5 toggle gyro
+    controller_neptune_deckops_bo2_hold.vdf      — BO2 dedicated layout, R5 hold gyro
+    controller_neptune_deckops_bo2_toggle.vdf    — BO2 dedicated layout, R5 toggle gyro
 
 Must be called while Steam is closed.
 """
@@ -36,6 +38,8 @@ TEMPLATES = [
     "controller_neptune_deckops_toggle.vdf",
     "controller_neptune_deckops_other_hold.vdf",
     "controller_neptune_deckops_other_toggle.vdf",
+    "controller_neptune_deckops_bo2_hold.vdf",
+    "controller_neptune_deckops_bo2_toggle.vdf",
 ]
 
 # ── Per-game profile assignment map ───────────────────────────────────────────
@@ -43,8 +47,7 @@ TEMPLATES = [
 # "standard" — the user's hold/toggle choice (normal gamepad layout)
 # "other"    — the user's hold/toggle choice but KB+M variant (for SP campaigns
 #              that need mouse-look via Steam Input)
-# "both"     — writes both standard AND other so the user can switch in Steam
-#              Input per session (CoD4, which shares one appid for SP and MP)
+# "bo2"      — dedicated BO2 layout (no dual input support)
 
 APPID_PROFILE_MAP = {
     "7940":   "standard",  # CoD4 — SP only (IW3SP-MOD); MP (CoD4x) handled by non-Steam shortcut
@@ -55,9 +58,9 @@ APPID_PROFILE_MAP = {
     "42690":  "standard",  # MW3 MP — Plutonium
     "42700":  "standard",  # BO1 SP/ZM — Plutonium
     "42710":  "standard",  # BO1 MP — Plutonium
-    "202970": "standard",  # BO2 SP — via Steam
-    "202990": "standard",  # BO2 MP — Plutonium
-    "212910": "standard",  # BO2 ZM — Plutonium
+    "202970": "bo2",       # BO2 SP — via Steam (dedicated layout, no dual input)
+    "202990": "bo2",       # BO2 MP — Plutonium (dedicated layout, no dual input)
+    "212910": "bo2",       # BO2 ZM — Plutonium (dedicated layout, no dual input)
 }
 
 # ── Named game keys used in configset_controller_neptune.vdf ──────────────────
@@ -124,11 +127,8 @@ def _profile_filename(profile_type: str, gyro_mode: str) -> list[str]:
         return [f"controller_neptune_deckops_{suffix}.vdf"]
     elif profile_type == "other":
         return [f"controller_neptune_deckops_other_{suffix}.vdf"]
-    elif profile_type == "both":
-        return [
-            f"controller_neptune_deckops_{suffix}.vdf",
-            f"controller_neptune_deckops_other_{suffix}.vdf",
-        ]
+    elif profile_type == "bo2":
+        return [f"controller_neptune_deckops_bo2_{suffix}.vdf"]
     return []
 
 
