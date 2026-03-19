@@ -68,17 +68,17 @@ Plutonium games require a free account at [plutonium.pw](https://plutonium.pw).
 
 ## Credits
 
-DeckOps is an installer. This project wouldn't exist without the years of foundational work from these teams, they truly deserve all of the credit:
+DeckOps is an installer. This project wouldn't exist without the years of foundational work from these teams. They truly deserve all the credit:
 
 **[CoD4x](https://cod4x.ovh)** - Modern Warfare 1 Multiplayer client. [GitHub](https://github.com/callofduty4x)
 
 **[IW3SP-MOD](https://gitea.com/JerryALT/iw3sp_mod)** - Modern Warfare 1 Singleplayer client by [JerryALT](https://gitea.com/JerryALT).
 
-**[iw4x](https://iw4x.io)** - Modern Warfare 2 Multiplayer. [GitHub](https://github.com/iw4x)
+**[iw4x](https://iw4x.io)** - Modern Warfare 2 Multiplayer client. [GitHub](https://github.com/iw4x)
 
 **[T6SP-Mod](https://github.com/Rattpak/T6SP-Mod-Release)** - Black Ops II Singleplayer client by [Rattpak](https://github.com/Rattpak).
 
-**[Plutonium](https://plutonium.pw)** - MW3 Multiplayer, World at War, Black Ops, Black Ops II. 💰 [Donate](https://forum.plutonium.pw/donate)
+**[Plutonium](https://plutonium.pw)** - Modern Warfare 3, World at War, Black Ops, and Black Ops II client. 💰 [Donate](https://forum.plutonium.pw/donate)
 
 ---
 **[PlutoniumAltLauncher](https://github.com/framilano/PlutoniumAltLauncher)** - Original inspiration for DeckOps.
