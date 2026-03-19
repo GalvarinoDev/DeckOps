@@ -732,7 +732,9 @@ class InstallScreen(QWidget):
                     self._s.progress.emit(bp, f"Setting up {base_name}...")
                 def op_plut(pct, msg, _b=bp): self._s.progress.emit(_b + int(pct / 100 * 8), msg)
                 try:
-                    compat = find_compatdata(self.steam_root, gd["appid"])
+                    from plutonium import GAME_META as _PLUT_META
+                    _plut_appid = _PLUT_META[key][0] if key in _PLUT_META else gd["appid"]
+                    compat = find_compatdata(self.steam_root, _plut_appid)
                     install_plutonium(game, key, self.steam_root, proton, compat, op_plut,
                                       protontricks_ready=protontricks_ready)
                     cfg.mark_game_setup(key, "plutonium")
@@ -1464,7 +1466,9 @@ class UpdateScreen(QWidget):
             def op(pct, msg, _b=bp): self._s.progress.emit(_b + int(pct / 100 * (90 // total)), msg)
             c = KEY_CLIENT.get(key, gd.get("client", ""))
             try:
-                compat = find_compatdata(self.steam_root, gd["appid"])
+                from plutonium import GAME_META as _PLUT_META
+                _appid = _PLUT_META[key][0] if (c == "plutonium" and key in _PLUT_META) else gd["appid"]
+                compat = find_compatdata(self.steam_root, _appid)
                 if c == "cod4x":
                     install_cod4x(game, self.steam_root, proton, compat, op)
                 elif c == "iw3sp":
