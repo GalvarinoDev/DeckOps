@@ -16,19 +16,25 @@ DeckOps automates the installation of iw4x, CoD4x, IW3SP-MOD, and Plutonium on S
 
 ## 🎮 Supported Games
 
-| Game | Modes | Client | Deck Model | Controller | Aim Assist | Gyro | Launch First |
-|---|---|---|---|---|---|---|---|
-| Modern Warfare 1 | SP | IW3SP-MOD | LCD + OLED | ✅ | ✅ | ✅ | SP |
-| Modern Warfare 1 | MP | CoD4x | LCD + OLED | ✅ | ❌ | ✅ | MP |
-| Modern Warfare 2 | MP | iw4x | LCD + OLED | ✅ | ✅ | ✅ | MP |
-| Modern Warfare 3 | MP | Plutonium | OLED only | ✅ | ✅ | ✅ | MP |
-| World at War | SP / MP / ZM | Plutonium | OLED only | ✅ | ✅ | ✅ | SP + MP |
-| Black Ops | SP / MP / ZM | Plutonium | OLED only | ✅ | ✅ | ✅ | SP + MP |
-| Black Ops II | MP / ZM | Plutonium | OLED only | ✅ | ✅ | ✅ | MP + ZM |
+| Game | Modes | Client | Deck Model | Aim Assist | Gyro |
+|---|---|---|---|---|---|
+| Modern Warfare 1 | SP | IW3SP-MOD | LCD + OLED | ✅ | ✅ |
+| Modern Warfare 1 | MP | CoD4x | LCD + OLED | ❌ | ✅ |
+| Modern Warfare 2 | MP | iw4x | LCD + OLED | ✅ | ✅ |
+| Modern Warfare 3 | MP | Plutonium | OLED only | ✅ | ✅ |
+| World at War | SP/ZM + MP | Plutonium | OLED only | ✅ | ✅ |
+| Black Ops | SP/ZM + MP | Plutonium | OLED only | ✅ | ✅ |
+| Black Ops II | ZM + MP | Plutonium | OLED only | ✅ | ✅ |
+
+> **Steam Deck LCD:** Plutonium online servers require OLED. For offline Campaign and Zombies on LCD, see [PlutoniumAltLauncher](https://github.com/framilano/PlutoniumAltLauncher).
 
 > All titles support controller and gyro via Steam Input. Choose **Hold** (R5 held) or **Toggle** (R5 press) during setup. Aim assist is not available for Steam-native modes (MW2 SP, MW3 SP, BO2 SP) yet. Black Ops II uses a dedicated controller layout that does not support dual input.
 
-> **Steam Deck LCD:** Plutonium online servers require OLED. For offline Campaign and Zombies on LCD, see [PlutoniumAltLauncher](https://github.com/framilano/PlutoniumAltLauncher).
+---
+
+## ⚠️ Before You Install
+
+Plutonium games require a free account at [plutonium.pw](https://plutonium.pw). Before running DeckOps, launch each game through Steam in every mode shown in the table above. This creates the Proton prefix and starts shader cache downloads. Skipping this is the most common cause of install failures.
 
 ---
 
@@ -43,12 +49,6 @@ DeckOps automates the installation of iw4x, CoD4x, IW3SP-MOD, and Plutonium on S
    - **Already installed:** A menu appears - choose to Launch, Reinstall, or Uninstall
 
 > Your Steam games are never touched. Only files created by DeckOps are removed during uninstall.
-
----
-
-## ⚠️ Before You Install
-
-Plutonium games require a free account at [plutonium.pw](https://plutonium.pw). Each game must also be launched through Steam in the correct modes before running DeckOps. This creates the Proton prefix and starts shader cache downloads. Skipping this is the most common cause of install failures.
 
 ---
 
