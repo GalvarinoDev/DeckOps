@@ -713,6 +713,16 @@ class InstallScreen(QWidget):
 
         # ── Plutonium games ───────────────────────────────────────────────────
         if has_plut:
+            from plutonium import _ensure_protontricks, XACT_GAME_KEYS
+            has_xact = any(k in XACT_GAME_KEYS for k in selected_keys)
+            protontricks_ready = False
+            if has_xact:
+                self._s.progress.emit(29, "Checking Protontricks...")
+                self._s.log.emit("Checking Protontricks for XACT audio...")
+                protontricks_ready = _ensure_protontricks(
+                    on_progress=lambda msg: self._s.log.emit(f"  {msg}")
+                )
+
             plut_selected = [(k, gd, g) for k, gd, g in self.selected if KEY_CLIENT.get(k) == "plutonium"]
             total_plut = len(plut_selected)
             for idx, (key, gd, game) in enumerate(plut_selected):
@@ -723,7 +733,8 @@ class InstallScreen(QWidget):
                 def op_plut(pct, msg, _b=bp): self._s.progress.emit(_b + int(pct / 100 * 8), msg)
                 try:
                     compat = find_compatdata(self.steam_root, gd["appid"])
-                    install_plutonium(game, key, self.steam_root, proton, compat, op_plut)
+                    install_plutonium(game, key, self.steam_root, proton, compat, op_plut,
+                                      protontricks_ready=protontricks_ready)
                     cfg.mark_game_setup(key, "plutonium")
                     if base_name not in logged_bases:
                         self._s.log.emit(f"✓  {base_name} done")

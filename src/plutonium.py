@@ -196,12 +196,112 @@ def _is_xact_installed(compatdata_path: str) -> bool:
     return len(found) == len(dlls)
 
 
-def _install_xact(compatdata_path: str, proton_path: str,
-                  steam_root: str, on_progress=None):
+def _find_protontricks() -> list[str] | None:
     """
-    Install XACT into the given Wine prefix using winetricks.
+    Locate protontricks, preferring the Flatpak version.
+    Returns the command prefix as a list, or None if not found.
+
+    Preference order:
+      1. Flatpak protontricks (com.github.Matoking.protontricks)
+      2. Native protontricks on PATH
+    """
+    # Check Flatpak first — most common on Steam Deck
+    try:
+        result = subprocess.run(
+            ["flatpak", "info", "com.github.Matoking.protontricks"],
+            capture_output=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            return ["flatpak", "run", "com.github.Matoking.protontricks"]
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    # Fall back to native protontricks
+    try:
+        result = subprocess.run(
+            ["protontricks", "--version"],
+            capture_output=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            return ["protontricks"]
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    return None
+
+
+def _ensure_protontricks_sd_access():
+    """
+    Grant the Flatpak protontricks access to /run/media so it can see
+    games installed on the SD card. Safe to call multiple times.
+    Errors are swallowed silently — this is best-effort and non-fatal
+    since the game prefix may still be on internal storage.
+    """
+    try:
+        subprocess.run(
+            [
+                "flatpak", "override", "--user",
+                "com.github.Matoking.protontricks",
+                "--filesystem=/run/media",
+            ],
+            capture_output=True,
+            timeout=10,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+
+def _ensure_protontricks(on_progress=None) -> bool:
+    """
+    Ensure protontricks is available, installing it via Flatpak if needed.
+    Also applies the /run/media filesystem override for SD card access.
+    Returns True if protontricks is available after this call.
+    """
+    def prog(msg):
+        if on_progress:
+            on_progress(msg)
+
+    if _find_protontricks() is not None:
+        _ensure_protontricks_sd_access()
+        return True
+
+    prog("Installing Protontricks (required for game audio)...")
+    try:
+        result = subprocess.run(
+            [
+                "flatpak", "install", "--user", "--noninteractive",
+                "flathub", "com.github.Matoking.protontricks",
+            ],
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            prog("Protontricks installed successfully.")
+            _ensure_protontricks_sd_access()
+            return True
+        else:
+            prog(
+                "Protontricks installation failed — XACT will be skipped. "
+                "Install Protontricks from Discover and rerun setup."
+            )
+            return False
+    except FileNotFoundError:
+        prog("Flatpak not found — cannot install Protontricks.")
+        return False
+
+
+def _install_xact(compatdata_path: str, proton_path: str,
+                  steam_root: str, appid: int, on_progress=None):
+    """
+    Install XACT into the given Wine prefix using protontricks.
     Required for audio in World at War and Black Ops.
     Skips silently if already installed.
+
+    compatdata_path — path to this game's compatdata prefix
+    proton_path     — kept for API consistency, not used
+    steam_root      — kept for API consistency, not used
+    appid           — Steam appid for the game (protontricks requires this)
     """
     def prog(msg):
         if on_progress:
@@ -213,26 +313,36 @@ def _install_xact(compatdata_path: str, proton_path: str,
 
     prog("Installing XACT (required for game audio)...")
 
-    env = os.environ.copy()
-    env["STEAM_COMPAT_DATA_PATH"]           = compatdata_path
-    env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = steam_root
-    env["WINEPREFIX"]                       = os.path.join(compatdata_path, "pfx")
+    protontricks = _find_protontricks()
+    if protontricks is None:
+        prog(
+            "protontricks not found — skipping XACT. "
+            "Install via Discover (search Protontricks) and rerun setup."
+        )
+        return False
+
+    # Ensure SD card access so protontricks can find the game prefix
+    _ensure_protontricks_sd_access()
+
+    cmd = protontricks + [str(appid), "-q", "xact"]
 
     try:
         result = subprocess.run(
-            ["winetricks", "--unattended", "xact"],
-            env=env,
-            timeout=180,
+            cmd,
+            capture_output=True,
+            timeout=300,
         )
         if result.returncode == 0:
             prog("XACT installed successfully.")
             return True
         else:
+            # A non-zero exit from protontricks/winetricks is often just
+            # a warning rather than a hard failure — verify via DLL check.
+            if _is_xact_installed(compatdata_path):
+                prog("XACT installed successfully.")
+                return True
             prog("XACT install finished with warnings — audio may still work.")
             return False
-    except FileNotFoundError:
-        prog("winetricks not found — skipping XACT. Install with: sudo pacman -S winetricks")
-        return False
     except subprocess.TimeoutExpired:
         prog("XACT install timed out — skipping.")
         return False
@@ -335,19 +445,22 @@ def _read_metadata(install_dir: str) -> dict:
 
 def install_plutonium(game: dict, game_key: str, steam_root: str,
                       proton_path: str, compatdata_path: str,
-                      on_progress=None, installed_games: dict = None):
+                      on_progress=None, installed_games: dict = None,
+                      protontricks_ready: bool = False):
     """
     Full install flow for a single Plutonium game.
 
     Assumes the user has already logged in and closed Plutonium via
     launch_bootstrapper(), and is_plutonium_ready() has returned True.
 
-    game            — entry from detect_games.find_installed_games()
-    game_key        — one of: t4sp, t4mp, t5sp, t5mp, t6zm, t6mp, iw5mp
-    steam_root      — path to Steam root
-    proton_path     — path to the proton executable
-    compatdata_path — path to this game's compatdata prefix
-    on_progress     — optional callback(percent: int, status: str)
+    game               — entry from detect_games.find_installed_games()
+    game_key           — one of: t4sp, t4mp, t5sp, t5mp, t6zm, t6mp, iw5mp
+    steam_root         — path to Steam root
+    proton_path        — path to the proton executable
+    compatdata_path    — path to this game's compatdata prefix
+    on_progress        — optional callback(percent: int, status: str)
+    protontricks_ready — True if _ensure_protontricks() has already been called
+                         by the caller. Avoids redundant detection per-game.
     """
     def prog(pct, msg):
         if on_progress:
@@ -373,10 +486,14 @@ def install_plutonium(game: dict, game_key: str, steam_root: str,
     # Only runs for t4/t5 titles — skipped entirely for t6/iw5.
     if game_key in XACT_GAME_KEYS:
         prog(50, f"Installing XACT audio components for {game['name']}...")
-        _install_xact(
-            compatdata_path, proton_path, steam_root,
-            on_progress=lambda msg: prog(55, msg),
-        )
+        if protontricks_ready:
+            _install_xact(
+                compatdata_path, proton_path, steam_root,
+                appid=GAME_META[game_key][0],
+                on_progress=lambda msg: prog(55, msg),
+            )
+        else:
+            prog(55, "XACT skipped — Protontricks unavailable.")
 
     prog(60, "Writing game path to config.json...")
     # Pass all keys that share this appid so config has all paths for this prefix.
