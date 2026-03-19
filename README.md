@@ -71,6 +71,7 @@ Plutonium games require a free account at [plutonium.pw](https://plutonium.pw).
 **[PlutoniumAltLauncher](https://github.com/framilano/PlutoniumAltLauncher)** - Original inspiration for DeckOps.
 
 ---
+DeckOps is an installer. This project wouldn't exist without the years of foundational work from these teams, they truly deserve all of the credit:
 
 **[CoD4x](https://cod4x.ovh)** - Call of Duty 4. [GitHub](https://github.com/callofduty4x)
 
