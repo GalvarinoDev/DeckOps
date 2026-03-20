@@ -20,9 +20,9 @@ DeckOps automates the installation of CoD4x, IW3SP-MOD, iw4x, T6SP-Mod, and Plut
 |---|---|---|---|---|---|
 | Modern Warfare 1 | SP | [IW3SP-MOD](https://gitea.com/JerryALT/iw3sp_mod) | LCD + OLED | ✅ | ✅ |
 | Modern Warfare 1 | MP | [CoD4x](https://cod4x.ovh) | LCD + OLED | 🚧 | ✅ |
-| Modern Warfare 2 | SP || LCD + OLED || ✅ |
+| Modern Warfare 2 | SP | ❌ | LCD + OLED | ❌ | ✅ |
 | Modern Warfare 2 | MP | [iw4x](https://iw4x.io) | LCD + OLED | ✅ | ✅ |
-| Modern Warfare 3 | SP || LCD + OLED || ✅ |
+| Modern Warfare 3 | SP | ❌ | LCD + OLED | ❌ | ✅ |
 | Modern Warfare 3 | MP | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
 | World at War | SP/ZM + MP | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
 | Black Ops | SP/ZM + MP | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
