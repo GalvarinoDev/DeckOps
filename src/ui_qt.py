@@ -230,11 +230,13 @@ def _title_block(lay, main_size=56):
     lay.addWidget(sub)
 
 class _Sigs(QObject):
-    progress  = pyqtSignal(int, str)
-    log       = pyqtSignal(str)
-    done      = pyqtSignal(bool)
-    plut_wait = pyqtSignal()
-    plut_go   = pyqtSignal()
+    progress    = pyqtSignal(int, str)
+    log         = pyqtSignal(str)
+    done        = pyqtSignal(bool)
+    plut_wait   = pyqtSignal()
+    plut_go     = pyqtSignal()
+    pulse_start = pyqtSignal(str)
+    pulse_stop  = pyqtSignal()
 
 # ── BootstrapScreen ────────────────────────────────────────────────────────────
 class BootstrapScreen(QWidget):
@@ -543,6 +545,26 @@ class InstallScreen(QWidget):
         self._s.done.connect(self._on_done)
         self._s.plut_wait.connect(lambda: self.plut_btn.setVisible(True))
         self._s.plut_go.connect(lambda: self.plut_btn.setVisible(False))
+        self._s.pulse_start.connect(self._start_pulse)
+        self._s.pulse_stop.connect(self._stop_pulse)
+
+        self._pulse_timer = QTimer()
+        self._pulse_timer.timeout.connect(self._do_pulse)
+        self._pulse_msg   = ""
+        self._pulse_count = 0
+
+    def _start_pulse(self, base_msg):
+        self._pulse_msg   = base_msg
+        self._pulse_count = 0
+        self._pulse_timer.start(500)
+
+    def _do_pulse(self):
+        dots = "." * (self._pulse_count % 4)
+        self.cur.setText(f"{self._pulse_msg}{dots}")
+        self._pulse_count += 1
+
+    def _stop_pulse(self):
+        self._pulse_timer.stop()
 
     def _append_log(self, text):
         self.log.appendPlainText(text)
@@ -552,6 +574,7 @@ class InstallScreen(QWidget):
         super().showEvent(e)
         self.bar.setValue(0); self.log.clear()
         self.plut_btn.setVisible(False)
+        self._stop_pulse()
         self._plut_event.clear()
         QTimer.singleShot(400, lambda: threading.Thread(target=self._run, daemon=True).start())
 
@@ -559,6 +582,7 @@ class InstallScreen(QWidget):
         self._plut_event.set()
 
     def _on_done(self, _):
+        self._stop_pulse()
         self.cur.setText("Installation complete!")
         self.cont_btn.setVisible(True)
 
@@ -649,13 +673,15 @@ class InstallScreen(QWidget):
 
         # ── GE-Proton download + extract (Steam still running) ────────────────
         try:
-            self._s.progress.emit(2, "Installing GE-Proton...")
+            self._s.pulse_start.emit("Installing GE-Proton")
             self._s.log.emit("Installing GE-Proton...")
             ge_version = install_ge_proton(
                 on_progress=lambda pct, msg: self._s.progress.emit(2 + int(pct * 0.08), msg)
             )
+            self._s.pulse_stop.emit()
             self._s.log.emit(f"✓  {ge_version} downloaded")
         except Exception as ex:
+            self._s.pulse_stop.emit()
             self._s.log.emit(f"  GE-Proton setup skipped: {ex}")
 
         proton = get_proton_path(self.steam_root)
@@ -719,12 +745,14 @@ class InstallScreen(QWidget):
             if has_xact:
                 self._s.progress.emit(29, "Installing XACT audio (once for all games)...")
                 self._s.log.emit("Installing XACT audio components (shared across WaW and Black Ops)...")
+                self._s.pulse_start.emit("Installing XACT audio")
                 xact_ready = install_xact_once(
                     [k for k in selected_keys if k in XACT_GAME_KEYS],
                     steam_root=self.steam_root,
                     proton_path=proton,
                     on_progress=lambda msg: self._s.log.emit(f"  {msg}"),
                 )
+                self._s.pulse_stop.emit()
 
             plut_selected = [(k, gd, g) for k, gd, g in self.selected if KEY_CLIENT.get(k) == "plutonium"]
             total_plut = len(plut_selected)

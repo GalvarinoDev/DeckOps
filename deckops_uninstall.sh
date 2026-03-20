@@ -312,6 +312,89 @@ PYEOF
 
 echo ""
 
+info "Removing DeckOps Deck configurator launch defaults from localconfig.vdf..."
+
+python3 - << 'PYEOF'
+import os, re
+
+# Appids whose DefaultLaunchOption DeckOps writes via set_default_launch_option.
+# These live in the Deck_ConfiguratorInterstitialApps "apps" block, not the
+# standard LaunchOptions flat key, so they need separate removal.
+DECK_APPIDS = {"7940", "10090"}
+
+steam_dir = os.path.expanduser("~/.local/share/Steam")
+userdata  = os.path.join(steam_dir, "userdata")
+
+if not os.path.isdir(userdata):
+    print("  No Steam userdata found — skipping.")
+    exit(0)
+
+def find_block_end(text, start):
+    depth = 0; i = start; in_quote = False
+    while i < len(text):
+        c = text[i]
+        if c == '"' and (i == 0 or text[i-1] != '\\'):
+            in_quote = not in_quote
+        elif not in_quote:
+            if c == '{': depth += 1
+            elif c == '}':
+                depth -= 1
+                if depth == 0: return i
+        i += 1
+    return -1
+
+for uid in os.listdir(userdata):
+    if not uid.isdigit() or int(uid) < 10000:
+        continue
+    vdf_path = os.path.join(userdata, uid, "config", "localconfig.vdf")
+    if not os.path.exists(vdf_path):
+        continue
+
+    with open(vdf_path, "r", errors="replace") as f:
+        content = f.read()
+
+    # Find the Deck configurator apps block
+    interstitial_pattern = re.compile(
+        r'"Deck_ConfiguratorInterstitialApps_AppLauncherInteractionIssues"'
+        r'\s*"[^"]*"\s*"apps"\s*\{',
+        re.IGNORECASE
+    )
+    m = interstitial_pattern.search(content)
+    if not m:
+        print(f"  uid {uid}: no Deck configurator block found — skipping")
+        continue
+
+    apps_open  = m.end() - 1
+    apps_close = find_block_end(content, apps_open)
+    if apps_close == -1:
+        continue
+
+    apps_block = content[apps_open + 1:apps_close]
+    modified   = False
+
+    for appid in DECK_APPIDS:
+        appid_pat = re.compile(r'"' + re.escape(appid) + r'"\s*\{', re.IGNORECASE)
+        am = appid_pat.search(apps_block)
+        if not am:
+            continue
+        entry_open  = am.start()
+        entry_close = find_block_end(apps_block, am.end() - 1)
+        if entry_close == -1:
+            continue
+        apps_block = apps_block[:entry_open] + apps_block[entry_close + 1:]
+        modified = True
+        print(f"  uid {uid}: removed DefaultLaunchOption for appid {appid}")
+
+    if modified:
+        content = content[:apps_open + 1] + apps_block + content[apps_close:]
+        with open(vdf_path, "w", errors="replace") as f:
+            f.write(content)
+    else:
+        print(f"  uid {uid}: no DeckOps configurator defaults found")
+PYEOF
+
+echo ""
+
 if [ -n "$STEAM_ROOT" ]; then
     COMPATDATA="$STEAM_ROOT/steamapps/compatdata"
     if [ -d "$COMPATDATA" ]; then
