@@ -4,6 +4,11 @@ cod4x.py - DeckOps installer for COD4x (Call of Duty 4: Modern Warfare)
 Downloads the official CoD4x setup executable, executes it silently via
 Proton, and allows the installer to handle registry/DLL registration
 natively within the game's prefix.
+
+The cod4x setup.exe bundles a Visual C++ 2010 Redistributable that launches
+as a child process and ignores the parent /VERYSILENT flags, producing a GUI
+popup. We pre-install vcrun2010 via protontricks so the bundled sub-installer
+sees it is already present and exits without showing any UI.
 """
 
 import os
@@ -49,13 +54,74 @@ def _write_metadata(install_dir: str, data: dict):
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
 
+# ── vcrun2010 pre-install ─────────────────────────────────────────────────────
+
+def _ensure_vcrun2010(appid: int, compatdata_path: str, on_progress=None) -> bool:
+    """
+    Pre-install vcrun2010 into the game's prefix via protontricks so that
+    the VC++ 2010 sub-installer bundled inside cod4x setup.exe sees it is
+    already present and exits silently without showing any UI.
+
+    Returns True if vcrun2010 is confirmed present after this call, or if
+    protontricks is unavailable (we still attempt the install and let the
+    popup occur rather than blocking the whole install).
+    """
+    def prog(msg):
+        if on_progress:
+            on_progress(0, msg)
+
+    # Import from plutonium to reuse the already-established protontricks helpers.
+    try:
+        from plutonium import _find_protontricks, _ensure_protontricks_sd_access
+    except ImportError:
+        prog("Could not import protontricks helpers — VC++ popup may appear.")
+        return False
+
+    protontricks = _find_protontricks()
+    if protontricks is None:
+        prog("Protontricks not found — VC++ popup may appear during CoD4x install.")
+        return False
+
+    _ensure_protontricks_sd_access()
+
+    # Check if vcrun2010 DLLs are already present in the prefix.
+    sys32 = os.path.join(compatdata_path, "pfx", "drive_c", "windows", "system32")
+    vcrun_marker = os.path.join(sys32, "msvcp100.dll")
+    if os.path.exists(vcrun_marker) and os.path.getsize(vcrun_marker) > 0:
+        prog("vcrun2010 already installed, skipping.")
+        return True
+
+    prog("Pre-installing vcrun2010 to suppress VC++ popup...")
+    try:
+        result = subprocess.run(
+            protontricks + [str(appid), "-q", "vcrun2010"],
+            capture_output=True,
+            timeout=180,
+        )
+        # protontricks may exit non-zero even on success — verify via file.
+        if os.path.exists(vcrun_marker) and os.path.getsize(vcrun_marker) > 0:
+            prog("vcrun2010 installed successfully.")
+            return True
+        if result.returncode == 0:
+            prog("vcrun2010 install reported success.")
+            return True
+        prog("vcrun2010 install finished with warnings — popup may still be suppressed.")
+        return False
+    except subprocess.TimeoutExpired:
+        prog("vcrun2010 install timed out — VC++ popup may appear.")
+        return False
+
+
 # ── public API ───────────────────────────────────────────────────────────────
 
 def install_cod4x(game: dict, steam_root: str, proton_path: str,
-                  compatdata_path: str, on_progress=None):
+                  compatdata_path: str, on_progress=None, appid: int = 7940):
     """
     Downloads and installs CoD4x using the official setup.exe inside
     the game's specific Proton prefix.
+
+    appid is used to pre-install vcrun2010 via protontricks so the VC++ 2010
+    sub-installer bundled in the cod4x setup.exe exits silently without a popup.
     """
     install_dir = game["install_dir"]
     setup_exe   = os.path.join(install_dir, "CoD4x_Setup.exe")
@@ -63,8 +129,13 @@ def install_cod4x(game: dict, steam_root: str, proton_path: str,
     def prog(pct, msg):
         if on_progress: on_progress(pct, msg)
 
-    prog(0, "Downloading CoD4x installer...")
-    _download(SETUP_URL, setup_exe, lambda p, m: prog(p, m), "Downloading CoD4x...")
+    # Pre-install vcrun2010 before downloading so the prefix is ready.
+    # This is fast if already installed (just a file check).
+    prog(0, "Checking Visual C++ 2010 runtime...")
+    _ensure_vcrun2010(appid, compatdata_path, on_progress=on_progress)
+
+    prog(5, "Downloading CoD4x installer...")
+    _download(SETUP_URL, setup_exe, lambda p, m: prog(5 + int(p * 0.45), m), "Downloading CoD4x...")
 
     prog(50, "Running installer...")
     env = {
