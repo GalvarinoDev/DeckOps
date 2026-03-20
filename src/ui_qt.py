@@ -1116,10 +1116,10 @@ class ControllerInfoScreen(QWidget):
         # ── Warning box ────────────────────────────────────────────────────────
         lay.addWidget(_lbl("⚠  Do This Before Anything Else", 13, C_TREY, bold=True, align=Qt.AlignLeft))
         lay.addWidget(_lbl(
-            "Steam will launch automatically, ignore it and return to Game Mode. "
-            "Do not use Steam in Desktop Mode until every modded game has been launched at least once, "
+            "You will be switched to Game Mode automatically. "
+            "Launch every modded game at least once before using Steam in Desktop Mode, "
             "especially MW1 (Singleplayer) and MW2 (Multiplayer). "
-            "Steam Cloud will overwrite your setup, requiring a full reinstall.",
+            "Steam Cloud will overwrite your setup if you don't.",
             11, C_DIM, align=Qt.AlignLeft))
         lay.addWidget(_lbl(
             "If Steam asks about cloud saves, choose Keep Local. "
@@ -1133,6 +1133,12 @@ class ControllerInfoScreen(QWidget):
             "When launching either game for the first time, Steam will ask which mode you want to launch. "
             "Select Singleplayer or Campaign and set it as your default. "
             "Multiplayer for these games launches via the DeckOps shortcuts in your library instead.",
+            11, C_DIM, align=Qt.AlignLeft))
+        lay.addWidget(_lbl(
+            "MW1 Singleplayer (IW3SP-MOD): On your first launch, "
+            "the game will ask you to select a profile. Choose \"Player\" — "
+            "this is the profile DeckOps created with your display settings. "
+            "Creating a new profile will use default settings instead.",
             11, C_DIM, align=Qt.AlignLeft))
 
         lay.addWidget(_hdiv())
@@ -1160,7 +1166,7 @@ class ControllerInfoScreen(QWidget):
 
         lay.addStretch()
 
-        cont = _btn("Continue  >>", C_IW, h=52)
+        cont = _btn("Switch to Game Mode  >>", C_IW, h=52)
         cont.clicked.connect(self._launch_steam)
         cw = QHBoxLayout(); cw.addStretch(); cw.addWidget(cont, stretch=1); cw.addStretch()
         lay.addLayout(cw)
@@ -1177,14 +1183,18 @@ class ControllerInfoScreen(QWidget):
 
     def _launch_steam(self):
         try:
-            steam_root = cfg.load().get("steam_root", "") or find_steam_root()
-            steam_sh = os.path.join(steam_root, "steam.sh") if steam_root else None
-            if steam_sh and os.path.exists(steam_sh):
-                subprocess.Popen([steam_sh], start_new_session=True)
-            else:
-                subprocess.Popen(["steam"], start_new_session=True)
+            subprocess.Popen(["steamos-session-select", "gamescope"], start_new_session=True)
         except Exception:
-            pass
+            # Fallback for non-SteamOS or if the command isn't available
+            try:
+                steam_root = cfg.load().get("steam_root", "") or find_steam_root()
+                steam_sh = os.path.join(steam_root, "steam.sh") if steam_root else None
+                if steam_sh and os.path.exists(steam_sh):
+                    subprocess.Popen([steam_sh], start_new_session=True)
+                else:
+                    subprocess.Popen(["steam"], start_new_session=True)
+            except Exception:
+                pass
         root = find_steam_root()
         self.stack.widget(5).set_installed(find_installed_games(parse_library_folders(root)))
         self.stack.setCurrentIndex(5)
