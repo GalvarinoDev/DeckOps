@@ -713,14 +713,17 @@ class InstallScreen(QWidget):
 
         # ── Plutonium games ───────────────────────────────────────────────────
         if has_plut:
-            from plutonium import _ensure_protontricks, XACT_GAME_KEYS
+            from plutonium import install_xact_once, XACT_GAME_KEYS
             has_xact = any(k in XACT_GAME_KEYS for k in selected_keys)
-            protontricks_ready = False
+            xact_ready = False
             if has_xact:
-                self._s.progress.emit(29, "Checking Protontricks...")
-                self._s.log.emit("Checking Protontricks for XACT audio...")
-                protontricks_ready = _ensure_protontricks(
-                    on_progress=lambda msg: self._s.log.emit(f"  {msg}")
+                self._s.progress.emit(29, "Installing XACT audio (once for all games)...")
+                self._s.log.emit("Installing XACT audio components (shared across WaW and Black Ops)...")
+                xact_ready = install_xact_once(
+                    [k for k in selected_keys if k in XACT_GAME_KEYS],
+                    steam_root=self.steam_root,
+                    proton_path=proton,
+                    on_progress=lambda msg: self._s.log.emit(f"  {msg}"),
                 )
 
             plut_selected = [(k, gd, g) for k, gd, g in self.selected if KEY_CLIENT.get(k) == "plutonium"]
@@ -736,7 +739,7 @@ class InstallScreen(QWidget):
                     _plut_appid = _PLUT_META[key][0] if key in _PLUT_META else gd["appid"]
                     compat = find_compatdata(self.steam_root, _plut_appid)
                     install_plutonium(game, key, self.steam_root, proton, compat, op_plut,
-                                      protontricks_ready=protontricks_ready)
+                                      protontricks_ready=xact_ready)
                     cfg.mark_game_setup(key, "plutonium")
                     if base_name not in logged_bases:
                         self._s.log.emit(f"✓  {base_name} done")
@@ -770,11 +773,8 @@ class InstallScreen(QWidget):
                     compat = find_compatdata(self.steam_root, gd["appid"])
                     c = KEY_CLIENT.get(key, gd["client"])
                     if c == "cod4x":
-                        self._s.log.emit(
-                            "⚠  CoD4 installer starting — a Visual C++ 2010 popup may appear.\n"
-                            "   Click Yes to install it."
-                        )
-                        install_cod4x(game, self.steam_root, proton, compat, op_cod4)
+                        install_cod4x(game, self.steam_root, proton, compat, op_cod4,
+                                      appid=gd["appid"])
                     elif c == "iw3sp":
                         install_iw3sp(game, self.steam_root, proton, compat, op_cod4)
                     cfg.mark_game_setup(key, c)
@@ -1470,7 +1470,8 @@ class UpdateScreen(QWidget):
                 _appid = _PLUT_META[key][0] if (c == "plutonium" and key in _PLUT_META) else gd["appid"]
                 compat = find_compatdata(self.steam_root, _appid)
                 if c == "cod4x":
-                    install_cod4x(game, self.steam_root, proton, compat, op)
+                    install_cod4x(game, self.steam_root, proton, compat, op,
+                                  appid=gd["appid"])
                 elif c == "iw3sp":
                     install_iw3sp(game, self.steam_root, proton, compat, op)
                 elif c == "iw4x":

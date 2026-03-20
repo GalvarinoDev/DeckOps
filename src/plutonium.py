@@ -54,6 +54,31 @@ METADATA_FILE = "deckops_plutonium.json"
 # Matches the xact=True flags in detect_games.py.
 XACT_GAME_KEYS = {"t4sp", "t4mp", "t5sp", "t5mp"}
 
+# DLLs dropped by the winetricks xact verb. We copy these directly between
+# prefixes instead of re-running protontricks for each game.
+XACT_DLLS = [
+    "xactengine2_0.dll",
+    "xactengine2_1.dll",
+    "xactengine2_2.dll",
+    "xactengine2_3.dll",
+    "xactengine2_4.dll",
+    "xactengine2_5.dll",
+    "xactengine2_6.dll",
+    "xactengine2_7.dll",
+    "xactengine2_8.dll",
+    "xactengine2_9.dll",
+    "xactengine3_0.dll",
+    "xactengine3_1.dll",
+    "xactengine3_2.dll",
+    "xactengine3_3.dll",
+    "xactengine3_4.dll",
+    "xactengine3_5.dll",
+    "xactengine3_6.dll",
+    "xactengine3_7.dll",
+    "xact3.dll",
+    "xaudio2_0.dll",
+]
+
 
 # ── path helpers ──────────────────────────────────────────────────────────────
 
@@ -350,6 +375,93 @@ def _install_xact(compatdata_path: str, proton_path: str,
     except subprocess.TimeoutExpired:
         prog("XACT install timed out , skipping.")
         return False
+
+
+def _copy_xact_dlls(src_compatdata: str, dst_compatdata: str, on_progress=None):
+    """
+    Copy XACT DLLs from one prefix's system32 to another's.
+    Only copies files that actually exist in src — winetricks may not
+    install all versions depending on the Wine build.
+    """
+    src_sys32 = _system32(src_compatdata)
+    dst_sys32 = _system32(dst_compatdata)
+    os.makedirs(dst_sys32, exist_ok=True)
+    copied = 0
+    for dll in XACT_DLLS:
+        src = os.path.join(src_sys32, dll)
+        if os.path.exists(src) and os.path.getsize(src) > 0:
+            shutil.copy2(src, os.path.join(dst_sys32, dll))
+            copied += 1
+    if on_progress:
+        on_progress(f"Copied {copied} XACT DLLs.")
+
+
+def install_xact_once(
+    xact_game_keys: list[str],
+    steam_root: str,
+    proton_path: str,
+    on_progress=None,
+) -> bool:
+    """
+    Install XACT into the first eligible prefix, then copy DLLs to all
+    remaining XACT-requiring prefixes. Avoids re-running protontricks
+    (which is slow) for every game that shares the same requirement.
+
+    Prefixes are deduped by appid — t4sp and t4mp share appid 10090 so
+    only one protontricks run is needed for both.
+
+    Returns True if XACT is available in all target prefixes after this call.
+    """
+    def prog(msg):
+        if on_progress:
+            on_progress(msg)
+
+    if not xact_game_keys:
+        return True
+
+    if not _ensure_protontricks(on_progress=on_progress):
+        return False
+
+    # Build deduped list of (key, appid, compatdata_path) by appid.
+    seen_appids = {}
+    targets = []
+    for key in xact_game_keys:
+        if key not in GAME_META:
+            continue
+        appid = GAME_META[key][0]
+        if appid not in seen_appids:
+            compat = os.path.join(
+                steam_root, "steamapps", "compatdata", str(appid)
+            )
+            seen_appids[appid] = compat
+            targets.append((key, appid, compat))
+
+    if not targets:
+        return True
+
+    # Install into the first prefix via protontricks.
+    primary_key, primary_appid, primary_compat = targets[0]
+    prog(f"Installing XACT into primary prefix (appid {primary_appid})...")
+    success = _install_xact(
+        primary_compat, proton_path, steam_root,
+        appid=primary_appid,
+        game_name=primary_key,
+        on_progress=on_progress,
+    )
+
+    if not success:
+        prog("XACT install failed on primary prefix — skipping copy step.")
+        return False
+
+    # Copy DLLs to remaining prefixes instead of re-running protontricks.
+    for key, appid, compat in targets[1:]:
+        if _is_xact_installed(compat):
+            prog(f"XACT already present in prefix {appid}, skipping.")
+            continue
+        prog(f"Copying XACT DLLs to prefix {appid}...")
+        _copy_xact_dlls(primary_compat, compat, on_progress=on_progress)
+
+    return True
 
 
 # ── config.json ───────────────────────────────────────────────────────────────
