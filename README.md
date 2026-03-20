@@ -16,98 +16,19 @@ DeckOps automates the installation of CoD4x, IW3SP-MOD, iw4x, T6SP-Mod, and Plut
 
 ## 🎮 Supported Games
 
-<table>
-  <thead>
-    <tr>
-      <th align="left">Game</th>
-      <th align="left">Modes</th>
-      <th align="left">Client</th>
-      <th align="left">Deck Model</th>
-      <th align="center">Aim Assist</th>
-      <th align="center">Gyro</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Modern Warfare 1</td>
-      <td>SP</td>
-      <td><b>IW3SP-MOD</b></td>
-      <td>LCD + OLED</td>
-      <td align="center">✅</td>
-      <td align="center">✅</td>
-    </tr>
-    <tr>
-      <td>Modern Warfare 1</td>
-      <td>MP</td>
-      <td><b>CoD4x</b></td>
-      <td>LCD + OLED</td>
-      <td align="center">❌</td>
-      <td align="center">✅</td>
-    </tr>
-    <tr>
-      <td>World at War</td>
-      <td>SP/ZM + MP</td>
-      <td><b>Plutonium</b></td>
-      <td>OLED only</td>
-      <td align="center">✅</td>
-      <td align="center">✅</td>
-    </tr>
+| Game | Modes | Client | Deck Model | Aim Assist | Gyro |
+|---|---|---|---|---|---|
+| Modern Warfare 1 | SP | [IW3SP-MOD](https://gitea.com/JerryALT/iw3sp_mod) | LCD + OLED | ✅ | ✅ |
+| Modern Warfare 1 | MP | [CoD4x](https://cod4x.ovh) | LCD + OLED | ❌ | ✅ |
+| Modern Warfare 2 | SP | — | LCD + OLED | — | ✅ |
+| Modern Warfare 2 | MP | [iw4x](https://iw4x.io) | LCD + OLED | ✅ | ✅ |
+| Modern Warfare 3 | SP | — | LCD + OLED | — | ✅ |
+| Modern Warfare 3 | MP | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
+| World at War | SP/ZM + MP | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
+| Black Ops | SP/ZM + MP | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
+| Black Ops II | SP | [T6SP-Mod](https://github.com/Rattpak/T6SP-Mod-Release) | LCD + OLED | 🚧 | 🚧 |
+| Black Ops II | ZM + MP | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
 
-    <tr style="background-color:#3a2e0f;">
-      <td><b>Modern Warfare 2</b></td>
-      <td>SP</td>
-      <td>—</td>
-      <td>LCD + OLED</td>
-      <td align="center">—</td>
-      <td align="center">✅</td>
-    </tr>
-
-    <tr>
-      <td>Modern Warfare 2</td>
-      <td>MP</td>
-      <td><b>iw4x</b></td>
-      <td>LCD + OLED</td>
-      <td align="center">✅</td>
-      <td align="center">✅</td>
-    </tr>
-
-    <tr>
-      <td>Black Ops</td>
-      <td>SP/ZM + MP</td>
-      <td><b>Plutonium</b></td>
-      <td>OLED only</td>
-      <td align="center">✅</td>
-      <td align="center">✅</td>
-    </tr>
-
-    <tr style="background-color:#3a2e0f;">
-      <td><b>Modern Warfare 3</b></td>
-      <td>SP</td>
-      <td>—</td>
-      <td>LCD + OLED</td>
-      <td align="center">—</td>
-      <td align="center">✅</td>
-    </tr>
-
-    <tr>
-      <td>Modern Warfare 3</td>
-      <td>MP</td>
-      <td><b>Plutonium</b></td>
-      <td>OLED only</td>
-      <td align="center">✅</td>
-      <td align="center">✅</td>
-    </tr>
-
-    <tr style="background-color:#1f3a34;">
-      <td><b>Black Ops II</b></td>
-      <td>SP</td>
-      <td><b>T6SP-Mod</b></td>
-      <td>LCD + OLED</td>
-      <td align="center">✅</td>
-      <td align="center">✅</td>
-    </tr>
-  </tbody>
-</table>
 > **Steam Deck LCD:** Plutonium online servers require OLED. For offline Campaign and Zombies on LCD, see [PlutoniumAltLauncher](https://github.com/framilano/PlutoniumAltLauncher).
 
 > All titles support controller and gyro via Steam Input. Choose **Hold** (R5 held) or **Toggle** (R5 press) during setup. Aim assist is not available for Steam-native modes (MW2 SP, MW3 SP, BO2 SP) yet. Black Ops II uses a dedicated controller layout that does not support dual input so Gyro feels a little different from other games.
