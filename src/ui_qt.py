@@ -1166,9 +1166,19 @@ class ControllerInfoScreen(QWidget):
 
         lay.addStretch()
 
+        lay.addWidget(_lbl(
+            "Switching to Game Mode may take a moment — do not turn off your Steam Deck during the transition.",
+            11, C_TREY, align=Qt.AlignCenter))
+        lay.addSpacing(4)
+
+        brow = QHBoxLayout(); brow.setSpacing(16)
         cont = _btn("Switch to Game Mode  >>", C_IW, h=52)
         cont.clicked.connect(self._launch_steam)
-        cw = QHBoxLayout(); cw.addStretch(); cw.addWidget(cont, stretch=1); cw.addStretch()
+        mgmt = _btn("My Games", C_DARK_BTN, h=52)
+        mgmt.setFixedWidth(180)
+        mgmt.clicked.connect(self._go_management)
+        brow.addWidget(mgmt); brow.addWidget(cont, stretch=1)
+        cw = QHBoxLayout(); cw.addStretch(); cw.addLayout(brow, stretch=1); cw.addStretch()
         lay.addLayout(cw)
 
     def showEvent(self, e):
@@ -1180,6 +1190,11 @@ class ControllerInfoScreen(QWidget):
             f"Note: Black Ops II MP and Zombies use a dedicated layout that does not support "
             f"dual input — gyro feel may differ from other titles."
         )
+
+    def _go_management(self):
+        root = find_steam_root()
+        self.stack.widget(5).set_installed(find_installed_games(parse_library_folders(root)))
+        self.stack.setCurrentIndex(5)
 
     def _launch_steam(self):
         try:
