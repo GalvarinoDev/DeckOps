@@ -206,16 +206,30 @@ def set_launch_options(steam_root, appid, options):
             existing = launch_match.group(2)
             if vdf_options in existing:
                 continue
-            new_options  = (existing.strip() + " " + vdf_options).strip()
-            new_app_inner = launch_pattern.sub(
+            new_options = (existing.strip() + " " + vdf_options).strip()
+            # Replace only within flat_section, then reassemble app_inner so we
+            # never accidentally hit a LaunchOptions key inside a cloud sub-block.
+            new_flat = launch_pattern.sub(
                 lambda m: m.group(1) + new_options + m.group(3),
-                app_inner,
+                flat_section,
                 count=1
             )
+            if subblock_match:
+                new_app_inner = new_flat + app_inner[subblock_match.start():]
+            else:
+                new_app_inner = new_flat
         else:
-            # Insert before the first sub-block, or at end if no sub-blocks
+            # Insert before the first sub-block, or at end if no sub-blocks.
+            # Derive indent from existing flat keys so the entry aligns correctly
+            # regardless of how deeply nested this appid block is in the file.
             indent_match = re.search(r'\n(\t+)"', flat_section)
-            indent = indent_match.group(1) if indent_match else '\t\t\t\t\t\t'
+            if indent_match:
+                indent = indent_match.group(1)
+            else:
+                # Fall back: count tabs on the opening key line itself
+                key_line = key_match.group(0)
+                leading  = re.match(r'(\t*)', key_line)
+                indent   = (leading.group(1) if leading else '\t\t\t\t\t') + '\t'
             insert_pos = subblock_match.start() if subblock_match else len(app_inner)
             insert_str = f'{indent}"LaunchOptions"\t\t"{vdf_options}"\n'
             new_app_inner = app_inner[:insert_pos] + insert_str + app_inner[insert_pos:]
@@ -549,6 +563,24 @@ def set_default_launch_option(steam_root, appids_config):
             if tips_match:
                 content  = content[:tips_match.start()] + deck_block + content[tips_match.start():]
                 modified = True
+            else:
+                # LaunchOptionTipsShown absent (fresh account) — try to insert
+                # before the closing brace of the Steam user block instead.
+                # Find the system block that contains localconfig keys — it sits
+                # inside "Software" -> "Valve" -> "Steam" in the file hierarchy.
+                steam_block_pattern = re.compile(r'"Steam"\s*\{', re.IGNORECASE)
+                steam_match = steam_block_pattern.search(content)
+                if steam_match:
+                    steam_open  = steam_match.end() - 1
+                    steam_close = _find_block_end(content, steam_open)
+                    if steam_close != -1:
+                        # Insert deck_block just before the Steam block closes
+                        content = (
+                            content[:steam_close] +
+                            deck_block +
+                            content[steam_close:]
+                        )
+                        modified = True
 
         if modified:
             with open(vdf_path, "w", errors="replace") as f:
