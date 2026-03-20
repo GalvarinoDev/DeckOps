@@ -20,14 +20,17 @@ DeckOps automates the installation of CoD4x, IW3SP-MOD, iw4x, T6SP-Mod, and Plut
 |---|---|---|---|---|---|
 | Modern Warfare 1 | SP | [IW3SP-MOD](https://gitea.com/JerryALT/iw3sp_mod) | LCD + OLED | ✅ | ✅ |
 | Modern Warfare 1 | MP | [CoD4x](https://cod4x.ovh) | LCD + OLED | ❌ | ✅ |
-| World at War | SP + ZM + MP | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
-| Modern Warfare 2 | SP | No client | LCD + OLED | ❌ | ✅ |
+| World at War | SP + ZM | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
+| World at War | MP | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
+| Modern Warfare 2 | SP | — | LCD + OLED | ❌ | ✅ |
 | Modern Warfare 2 | MP | [iw4x](https://iw4x.io) | LCD + OLED | ✅ | ✅ |
-| Black Ops | SP + ZM + MP | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
-| Modern Warfare 3 | SP | No client | LCD + OLED | ❌ | ✅ |
+| Black Ops | SP + ZM | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
+| Black Ops | MP | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
+| Modern Warfare 3 | SP | — | LCD + OLED | ❌ | ✅ |
 | Modern Warfare 3 | MP | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
 | Black Ops II | SP | T6SP-Mod ¹ | LCD + OLED | ✅ | ✅ |
-| Black Ops II | ZM + MP | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
+| Black Ops II | ZM | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
+| Black Ops II | MP | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
 
 > Plutonium online servers require an OLED Steam Deck. LCD users can still play offline Campaign and Zombies via [PlutoniumAltLauncher](https://github.com/framilano/PlutoniumAltLauncher).
 
@@ -63,10 +66,10 @@ Plutonium games require a free account at [plutonium.pw](https://plutonium.pw).
 
 ## ⚠️ After Installation
 
-**DeckOps will switch you to Game Mode automatically.** The transition may take a moment — do not turn off your Steam Deck. Launch every modded game at least once before using Steam in Desktop Mode, or Steam Cloud will overwrite your setup. If asked about cloud saves choose **Keep Local**. If asked about launching in safe mode or changing your settings due to a hardware change choose **No**.
+**DeckOps will switch you to Game Mode automatically.** The transition may take a moment, do not turn off your Steam Deck. Launch every modded game at least once before using Steam in Desktop Mode, or Steam Cloud will overwrite your setup. If asked about cloud saves choose **Keep Local**. If asked about launching in safe mode or changing your settings due to a hardware change choose **No**.
 
 - **MW1 & WaW:** Steam will ask which mode to launch on first run. Select Singleplayer or Campaign and set it as your default. Multiplayer for these games launches via the DeckOps shortcuts in your library instead.
-- **MW1 SP (IW3SP-MOD):** On first launch, the game will ask you to select a profile. Choose **Player** — this is the profile DeckOps created with your display settings. Creating a new profile will use default settings instead.
+- **MW1 SP (IW3SP-MOD):** On first launch, the game will ask you to select a profile. Choose **Player**, this is the profile DeckOps created with your display settings. Creating a new profile will use default settings instead.
 - **MW1 MP** requires two Steam launches to finish setup, then runs normally on the third.
 - **BO2 SP** display settings must be set manually in-game. MP and ZM are configured automatically.
 - The latest GE-Proton is downloaded and set automatically for all games.
