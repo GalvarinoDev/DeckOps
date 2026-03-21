@@ -332,7 +332,13 @@ class BootstrapScreen(QWidget):
 class IntroScreen(QWidget):
     def __init__(self, stack):
         super().__init__(); self.stack = stack
-        lay = QVBoxLayout(self); lay.setContentsMargins(80,60,80,60); lay.setSpacing(16)
+        self._selected_model = ""
+
+        main_lay = QVBoxLayout(self); main_lay.setContentsMargins(0,0,0,0)
+
+        # ── Model section (first screen) ──────────────────────────────────────
+        self._model_section = QWidget()
+        lay = QVBoxLayout(self._model_section); lay.setContentsMargins(80,60,80,60); lay.setSpacing(16)
         _title_block(lay)
         lay.addSpacing(8)
         lay.addWidget(_lbl(
@@ -353,28 +359,39 @@ class IntroScreen(QWidget):
             lay.addWidget(_lbl(warn, 13, C_TREY, align=Qt.AlignLeft))
         lay.addSpacing(16)
 
-        # ── Model question ────────────────────────────────────────────────────
-        self._model_section = QWidget()
-        ml = QVBoxLayout(self._model_section); ml.setContentsMargins(0,0,0,0); ml.setSpacing(12)
-        ml.addWidget(_lbl("Which Steam Deck do you have?", 15, "#CCC"))
+        lay.addWidget(_lbl("Which Steam Deck do you have?", 15, "#CCC"))
         brow = QHBoxLayout(); brow.setSpacing(20)
         lcd  = _btn("Steam Deck LCD", C_DARK_BTN, h=56)
         oled = _btn("Steam Deck OLED", C_IW, h=56)
         lcd.clicked.connect(lambda: self._pick_model("lcd"))
         oled.clicked.connect(lambda: self._pick_model("oled"))
         brow.addWidget(lcd); brow.addWidget(oled)
-        ml.addLayout(brow)
-        lay.addWidget(self._model_section)
+        lay.addLayout(brow)
+        main_lay.addWidget(self._model_section)
 
-        # ── Gyro question — swaps in after model is picked ────────────────────
+        # ── Gyro section (second screen, replaces model section) ──────────────
         self._gyro_section = QWidget(); self._gyro_section.setVisible(False)
-        gl = QVBoxLayout(self._gyro_section); gl.setContentsMargins(0,0,0,0); gl.setSpacing(12)
+        gl = QVBoxLayout(self._gyro_section); gl.setContentsMargins(80,60,80,60); gl.setSpacing(16)
+
+        # Back button top-left showing which model was picked
+        self._back_btn = _btn("← Steam Deck OLED", C_DARK_BTN, size=11, h=36)
+        self._back_btn.setFixedWidth(220)
+        self._back_btn.clicked.connect(self._back_to_model)
+        back_row = QHBoxLayout()
+        back_row.addWidget(self._back_btn); back_row.addStretch()
+        gl.addLayout(back_row)
+
+        gl.addStretch()
+        _title_block(gl)
+        gl.addSpacing(16)
         gl.addWidget(_lbl("How do you want to activate gyro aiming?", 15, "#CCC"))
+        gl.addSpacing(4)
         gl.addWidget(_lbl(
             "Hold  —  gyro is active while R5 (right grip) is held down.\n"
             "ADS  —  gyro activates when you aim down sights.\n"
             "Toggle  —  press R5 once to turn gyro on, press again to turn it off.",
             13, C_DIM, align=Qt.AlignLeft))
+        gl.addSpacing(12)
         grow = QHBoxLayout(); grow.setSpacing(20)
         hold_btn   = _btn("Hold",   C_DARK_BTN, h=56)
         ads_btn    = _btn("ADS",    C_DARK_BTN, h=56)
@@ -384,15 +401,8 @@ class IntroScreen(QWidget):
         toggle_btn.clicked.connect(lambda: self._pick_gyro("toggle"))
         grow.addWidget(hold_btn); grow.addWidget(ads_btn); grow.addWidget(toggle_btn)
         gl.addLayout(grow)
-        back_row = QHBoxLayout()
-        back_row.addStretch()
-        gyro_back = _btn("← Back", C_DARK_BTN, size=10, h=30)
-        gyro_back.setFixedWidth(80)
-        gyro_back.clicked.connect(self._back_to_model)
-        back_row.addWidget(gyro_back)
-        back_row.addStretch()
-        gl.addLayout(back_row)
-        lay.addWidget(self._gyro_section)
+        gl.addStretch()
+        main_lay.addWidget(self._gyro_section)
 
     def _back_to_model(self):
         self._gyro_section.setVisible(False)
@@ -400,6 +410,8 @@ class IntroScreen(QWidget):
 
     def _pick_model(self, model):
         cfg.set_deck_model(model)
+        label = "Steam Deck OLED" if model == "oled" else "Steam Deck LCD"
+        self._back_btn.setText(f"← {label}")
         self._model_section.setVisible(False)
         self._gyro_section.setVisible(True)
 
@@ -773,6 +785,17 @@ class InstallScreen(QWidget):
         _kill_steam_once()
         _apply_compat()
         _set_launch_defaults()
+
+        # ── Clean up stale launch options from older DeckOps versions ─────────
+        # Old versions used launch commands instead of the exe rename strategy.
+        # If those are still in localconfig.vdf they'll conflict with the rename.
+        try:
+            from wrapper import clear_launch_options
+            for stale_appid in ["7940", "10190"]:
+                clear_launch_options(self.steam_root, stale_appid)
+            self._s.log.emit("✓  Stale launch options cleared")
+        except Exception as ex:
+            self._s.log.emit(f"  Launch option cleanup skipped: {ex}")
 
         # ── Plutonium games ───────────────────────────────────────────────────
         if has_plut:
@@ -1625,6 +1648,15 @@ class UpdateScreen(QWidget):
                 self._s.log.emit("  ✓ Steam closed.")
             except Exception as ex:
                 self._s.log.emit(f"  Could not close Steam: {ex}")
+
+        # Clean up stale launch options from older DeckOps versions
+        if has_cod4 or has_iw4x:
+            try:
+                from wrapper import clear_launch_options
+                for stale_appid in ["7940", "10190"]:
+                    clear_launch_options(self.steam_root, stale_appid)
+            except Exception:
+                pass
 
         for idx, (key, gd, game) in enumerate(self.selected):
             if not game:
