@@ -146,9 +146,10 @@ restore_exe() {
 info "Restoring original game executables..."
 
 if [ -n "$STEAM_ROOT" ]; then
-    # Only Plutonium games (iw5mp, t4, t5, t6) use exe backups — iw3sp and iw4x
-    # now use Steam launch options instead of renaming, so no restore needed there.
+    # iw3sp and iw4x now use the rename scheme — restore from .bak alongside Plutonium games.
     declare -A GAME_EXES=(
+        [7940]="iw3sp.exe"
+        [10190]="iw4mp.exe"
         [42690]="iw5mp.exe"
     )
     declare -A GAME_EXES_MULTI=(
@@ -221,95 +222,6 @@ if [ -n "$STEAM_ROOT" ]; then
         skip "CoD4 install directory not found"
     fi
 fi
-echo ""
-
-info "Removing DeckOps launch options from localconfig.vdf..."
-
-python3 - << 'PYEOF'
-import os, re
-
-# Appids and the launch option strings DeckOps sets
-LAUNCH_OPTIONS = {
-    "7940":  "bash -c 'exec \"${@/iw3sp.exe/iw3sp_mod.exe}\"' -- %command%",
-    "10190": "bash -c 'exec \"${@/iw4mp.exe/iw4x.exe}\"' -- %command%",
-}
-
-steam_dir = os.path.expanduser("~/.local/share/Steam")
-userdata  = os.path.join(steam_dir, "userdata")
-
-if not os.path.isdir(userdata):
-    print("  No Steam userdata found — skipping.")
-    exit(0)
-
-def find_block_end(text, start):
-    """
-    WARNING: Must skip braces inside quoted strings — bash substitutions
-    like ${@/iw3sp.exe/iw3sp_mod.exe} contain } that must NOT be counted
-    as block delimiters. Failure corrupts localconfig.vdf.
-    """
-    depth = 0
-    i = start
-    in_quote = False
-    while i < len(text):
-        c = text[i]
-        if c == '"' and (i == 0 or text[i-1] != '\\'):
-            in_quote = not in_quote
-        elif not in_quote:
-            if c == '{':
-                depth += 1
-            elif c == '}':
-                depth -= 1
-                if depth == 0:
-                    return i
-        i += 1
-    return -1
-
-for uid in os.listdir(userdata):
-    if not uid.isdigit() or int(uid) < 10000:
-        continue
-    vdf_path = os.path.join(userdata, uid, "config", "localconfig.vdf")
-    if not os.path.exists(vdf_path):
-        continue
-
-    with open(vdf_path, "r", errors="replace") as f:
-        content = f.read()
-
-    modified = False
-    for appid, option in LAUNCH_OPTIONS.items():
-        key_match = re.search(r'"' + re.escape(appid) + r'"\s*\{', content, re.IGNORECASE)
-        if not key_match:
-            continue
-
-        app_open  = key_match.end() - 1
-        app_close = find_block_end(content, app_open)
-        if app_close == -1:
-            continue
-
-        app_inner = content[app_open + 1:app_close]
-
-        # Only remove from the flat block (before any sub-blocks)
-        # Steam reads LaunchOptions from the flat block, not sub-blocks.
-        subblock_match = re.search(r'"[^"]+"\s*\{', app_inner)
-        flat_section = app_inner[:subblock_match.start()] if subblock_match else app_inner
-
-        launch_pattern = re.compile(r'"LaunchOptions"\s*"[^"]*"', re.IGNORECASE)
-        if re.search(launch_pattern, flat_section) and option in flat_section:
-            new_flat = launch_pattern.sub('', flat_section)
-            if subblock_match:
-                new_app_inner = new_flat + app_inner[subblock_match.start():]
-            else:
-                new_app_inner = new_flat
-            content = content[:app_open + 1] + new_app_inner + content[app_close:]
-            modified = True
-            print(f"  uid {uid}: cleared launch option for appid {appid}")
-
-    if modified:
-        with open(vdf_path, "w", errors="replace") as f:
-            f.write(content)
-    else:
-        print(f"  uid {uid}: no DeckOps launch options found")
-PYEOF
-
 echo ""
 
 info "Removing DeckOps Deck configurator launch defaults from localconfig.vdf..."
@@ -669,8 +581,10 @@ TEMPLATE_DIR="$HOME/.steam/steam/controller_base/templates"
 for f in \
     "controller_neptune_deckops_hold.vdf" \
     "controller_neptune_deckops_toggle.vdf" \
+    "controller_neptune_deckops_ads.vdf" \
     "controller_neptune_deckops_other_hold.vdf" \
-    "controller_neptune_deckops_other_toggle.vdf"; do
+    "controller_neptune_deckops_other_toggle.vdf" \
+    "controller_neptune_deckops_other_ads.vdf"; do
     target="$TEMPLATE_DIR/$f"
     if [ -f "$target" ]; then
         rm -f "$target" && success "Removed $f" || warn "Failed to remove $f"
@@ -959,7 +873,7 @@ echo ""
 
 echo -e "${GREEN}${BOLD}  DeckOps fully uninstalled.${CLEAR}"
 echo ""
-echo "  Your Steam games are untouched. Steam launch options cleared."
+echo "  Your Steam games are untouched."
 echo "  All Plutonium data removed from Wine prefixes."
 echo "  All IW3SP-MOD and IW4x client files removed."
 echo "  All DeckOps controller templates and profiles removed."
@@ -973,7 +887,7 @@ echo ""
 # Show summary dialog in background while countdown runs in terminal
 zenity --info \
     --title="DeckOps Uninstaller" \
-    --text="DeckOps fully uninstalled.\n\nYour Steam games are untouched. Steam launch options cleared.\nAll Plutonium data removed from Wine prefixes.\nAll IW3SP-MOD and IW4x client files removed.\nAll DeckOps controller templates and profiles removed." \
+    --text="DeckOps fully uninstalled.\n\nYour Steam games are untouched.\nAll Plutonium data removed from Wine prefixes.\nAll IW3SP-MOD and IW4x client files removed.\nAll DeckOps controller templates and profiles removed." \
     --timeout=6 \
     2>/dev/null &
 

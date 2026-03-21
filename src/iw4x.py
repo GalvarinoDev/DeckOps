@@ -2,16 +2,23 @@
 iw4x.py - DeckOps installer for IW4x (Modern Warfare 2)
 
 Downloads iw4x.dll, iw4x.exe, release.zip and iwd files directly from
-the latest GitHub release into the MW2 install folder. Sets a Steam launch
-option on appid 10190 to run iw4x.exe directly — no exe renaming needed.
+the latest GitHub release into the MW2 install folder, then:
+  - Renames iw4mp.exe -> iw4mp.exe.bak
+  - Copies iw4x.exe -> iw4mp.exe
+
+This lets Steam launch IW4x transparently via the existing shortcut
+with no launch options or localconfig.vdf writes required.
 
 Progress is reported via a callback:
     on_progress(percent: int, status: str)
 """
 
 import os
+import shutil
 import zipfile
+import threading
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 BASE_URL = "https://github.com/iw4x/iw4x-client/releases/latest/download"
 RAW_URL  = "https://github.com/iw4x/iw4x-rawfiles/releases/latest/download"
@@ -59,11 +66,8 @@ def _download(url: str, dest: str, on_progress=None, label: str = ""):
 
 
 def is_iw4x_installed(install_dir: str) -> bool:
-    """Returns True if iw4x.dll and iw4x.exe are present."""
-    return (
-        os.path.exists(os.path.join(install_dir, "iw4x.dll")) and
-        os.path.exists(os.path.join(install_dir, "iw4x.exe"))
-    )
+    """Returns True if iw4mp.exe.bak exists (meaning the mod rename is active)."""
+    return os.path.exists(os.path.join(install_dir, "iw4mp.exe.bak"))
 
 
 # ── public API ────────────────────────────────────────────────────────────────
@@ -74,12 +78,12 @@ def install_iw4x(game: dict, steam_root: str,
     """
     Install or reinstall IW4x for Modern Warfare 2.
 
-    Downloads all IW4x files into the MW2 install directory and sets a Steam
-    launch option on appid 10190 to run iw4x.exe directly.
-    The original iw4mp.exe is left untouched.
+    Downloads iw4x.dll, iw4x.exe, release.zip, and iwd files concurrently,
+    then renames iw4mp.exe -> iw4mp.exe.bak and copies iw4x.exe -> iw4mp.exe
+    so Steam launches IW4x transparently. No launch options are written.
 
     game            — entry from detect_games.find_installed_games()
-    steam_root      — path to Steam root
+    steam_root      — path to Steam root (kept for API consistency)
     proton_path     — path to the proton executable (kept for API consistency)
     compatdata_path — path to the MW2 compatdata prefix (kept for API consistency)
     on_progress     — optional callback(percent: int, status: str)
@@ -92,10 +96,8 @@ def install_iw4x(game: dict, steam_root: str,
         if on_progress:
             on_progress(pct, msg)
 
-    # Download iw4x.dll, iw4x.exe and release.zip in parallel — they're independent
+    # ── Download iw4x.dll, iw4x.exe, release.zip concurrently ────────────────
     prog(5, "Downloading iw4x files...")
-    import threading
-    from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
 
     dl_tasks = [
         (f"{BASE_URL}/iw4x.dll",   os.path.join(install_dir, "iw4x.dll"),  "iw4x.dll"),
@@ -103,18 +105,18 @@ def install_iw4x(game: dict, steam_root: str,
         (f"{RAW_URL}/release.zip", os.path.join(install_dir, "release.zip"), "release.zip"),
     ]
     dl_errors = []
-    dl_lock   = threading.Lock()
     dl_done   = [0]
+    dl_lock   = threading.Lock()
 
     def _dl(url, dest, label):
         _download(url, dest, None, f"Downloading {label}...")
         with dl_lock:
             dl_done[0] += 1
-            prog(5 + int(dl_done[0] / len(dl_tasks) * 50), f"Downloaded {label}")
+            prog(5 + int(dl_done[0] / len(dl_tasks) * 45), f"Downloaded {label}")
 
     with ThreadPoolExecutor(max_workers=3) as ex:
         futs = {ex.submit(_dl, url, dest, label): label for url, dest, label in dl_tasks}
-        for fut in _as_completed(futs):
+        for fut in as_completed(futs):
             try:
                 fut.result()
             except Exception as e:
@@ -123,38 +125,42 @@ def install_iw4x(game: dict, steam_root: str,
     if dl_errors:
         raise RuntimeError("Download failed:\n" + "\n".join(dl_errors))
 
-    # Extract release.zip
-    prog(58, "Extracting rawfiles...")
+    # ── Extract release.zip ───────────────────────────────────────────────────
+    prog(52, "Extracting rawfiles...")
     zip_dest = os.path.join(install_dir, "release.zip")
     with zipfile.ZipFile(zip_dest) as zf:
         zf.extractall(install_dir)
     os.remove(zip_dest)
 
-    # iwd files → iw4x/ subfolder — downloaded in parallel
+    # ── Rename iw4mp.exe -> iw4mp.exe.bak, copy iw4x.exe -> iw4mp.exe ───────
+    iw4mp     = os.path.join(install_dir, "iw4mp.exe")
+    iw4mp_bak = os.path.join(install_dir, "iw4mp.exe.bak")
+    iw4x_exe  = os.path.join(install_dir, "iw4x.exe")
+
+    prog(57, "Replacing iw4mp.exe...")
+    if os.path.exists(iw4mp) and not os.path.exists(iw4mp_bak):
+        os.rename(iw4mp, iw4mp_bak)
+    if os.path.exists(iw4x_exe):
+        shutil.copy2(iw4x_exe, iw4mp)
+
+    # ── iwd files -> iw4x/ subfolder concurrently ────────────────────────────
     prog(62, "Downloading iwd files...")
-    errors = []
-    completed = 0
-    total_iwds = len(IWD_FILES)
-    lock = threading.Lock()
+    errors    = []
+    completed = [0]
+    iwd_lock  = threading.Lock()
 
     def _download_iwd(iwd):
-        nonlocal completed
         dest = os.path.join(iw4x_dir, iwd)
         if not os.path.exists(dest):
-            _download(
-                f"{RAW_URL}/{iwd}",
-                dest,
-                None,
-                f"Downloading {iwd}...",
-            )
-        with lock:
-            completed += 1
-            pct = 62 + int(completed / total_iwds * 25)
-            prog(pct, f"Downloaded {completed}/{total_iwds} iwd files...")
+            _download(f"{RAW_URL}/{iwd}", dest, None, f"Downloading {iwd}...")
+        with iwd_lock:
+            completed[0] += 1
+            pct = 62 + int(completed[0] / len(IWD_FILES) * 33)
+            prog(pct, f"Downloaded {completed[0]}/{len(IWD_FILES)} iwd files...")
 
     with ThreadPoolExecutor(max_workers=6) as executor:
         futures = {executor.submit(_download_iwd, iwd): iwd for iwd in IWD_FILES}
-        for future in _as_completed(futures):
+        for future in as_completed(futures):
             try:
                 future.result()
             except Exception as ex:
@@ -168,11 +174,17 @@ def install_iw4x(game: dict, steam_root: str,
 
 def uninstall_iw4x(game: dict):
     """
-    Remove IW4x files from the MW2 install folder.
-    The original iw4mp.exe is untouched — no backup restore needed.
+    Restore iw4mp.exe from iw4mp.exe.bak and remove all IW4x files.
     """
-    import shutil
     install_dir = game["install_dir"]
+
+    # Restore iw4mp.exe from backup
+    iw4mp     = os.path.join(install_dir, "iw4mp.exe")
+    iw4mp_bak = os.path.join(install_dir, "iw4mp.exe.bak")
+    if os.path.exists(iw4mp_bak):
+        if os.path.exists(iw4mp):
+            os.remove(iw4mp)
+        os.rename(iw4mp_bak, iw4mp)
 
     for fname in ["iw4x.dll", "iw4x.exe"]:
         p = os.path.join(install_dir, fname)
