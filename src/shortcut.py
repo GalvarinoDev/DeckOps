@@ -29,6 +29,7 @@ import urllib.request
 STEAM_ROOT     = os.path.expanduser("~/.local/share/Steam")
 USERDATA_DIR   = os.path.join(STEAM_ROOT, "userdata")
 COMPAT_ROOT    = os.path.join(STEAM_ROOT, "steamapps", "compatdata")
+STEAM_CONFIG   = os.path.join(STEAM_ROOT, "config", "config.vdf")
 
 _HERE          = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT   = os.path.dirname(_HERE)
@@ -98,6 +99,21 @@ def _find_all_steam_uids():
         seen.add(real)
         uids.append(entry)
     return uids
+
+
+def _get_deck_serial() -> str | None:
+    """Read the Steam Deck serial number from Steam's config.vdf."""
+    if not os.path.exists(STEAM_CONFIG):
+        return None
+    try:
+        with open(STEAM_CONFIG, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+        match = re.search(r'"SteamDeckRegisteredSerialNumber"\s+"([^"]+)"', content)
+        if match:
+            return match.group(1)
+    except Exception:
+        pass
+    return None
 
 
 def _calc_shortcut_appid(exe_path: str, name: str) -> int:
@@ -335,6 +351,12 @@ def _assign_controller_config(uid: str, appid: int, shortcut_def: dict,
     # Patch configset_controller_neptune.vdf
     configset_path = os.path.join(steam_cfg_root, "configset_controller_neptune.vdf")
     _patch_configset(configset_path, appid_str, template_filename)
+    
+    # Patch configset_{serial}.vdf — SteamOS on Deck reads from this file
+    serial = _get_deck_serial()
+    if serial:
+        configset_serial = os.path.join(steam_cfg_root, f"configset_{serial}.vdf")
+        _patch_configset(configset_serial, appid_str, template_filename)
     
     prog(f"    ✓ Controller: {template_filename}")
 
