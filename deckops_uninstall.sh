@@ -670,9 +670,7 @@ for f in \
     "controller_neptune_deckops_hold.vdf" \
     "controller_neptune_deckops_toggle.vdf" \
     "controller_neptune_deckops_other_hold.vdf" \
-    "controller_neptune_deckops_other_toggle.vdf" \
-    "controller_neptune_deckops_bo2_hold.vdf" \
-    "controller_neptune_deckops_bo2_toggle.vdf"; do
+    "controller_neptune_deckops_other_toggle.vdf"; do
     target="$TEMPLATE_DIR/$f"
     if [ -f "$target" ]; then
         rm -f "$target" && success "Removed $f" || warn "Failed to remove $f"
