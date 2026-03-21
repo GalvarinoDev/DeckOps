@@ -20,7 +20,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button A, , "
+							"binding"		"xinput_button A, Stand/Jump, "
 						}
 					}
 				}
@@ -36,7 +36,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button B, , "
+							"binding"		"xinput_button B, Crouch/Prone, "
 						}
 					}
 				}
@@ -52,7 +52,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button X, , "
+							"binding"		"xinput_button X, Use/Reload, "
 						}
 					}
 				}
@@ -68,7 +68,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button Y, , "
+							"binding"		"xinput_button Y, Switch Weapon, "
 						}
 					}
 				}
@@ -94,7 +94,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button dpad_up, , "
+							"binding"		"xinput_button dpad_up, Inventory, "
 						}
 						"settings"
 						{
@@ -114,7 +114,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button dpad_down, , "
+							"binding"		"xinput_button dpad_down, Inventory, "
 						}
 						"settings"
 						{
@@ -134,7 +134,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button dpad_right, , "
+							"binding"		"xinput_button dpad_right, Inventory, "
 						}
 						"settings"
 						{
@@ -154,7 +154,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button dpad_left, , "
+							"binding"		"xinput_button dpad_left, Inventory, "
 						}
 						"settings"
 						{
@@ -184,7 +184,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button JOYSTICK_RIGHT, , "
+							"binding"		"xinput_button JOYSTICK_RIGHT, Melee, "
 						}
 					}
 				}
@@ -210,7 +210,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button JOYSTICK_LEFT, , "
+							"binding"		"xinput_button JOYSTICK_LEFT, Sprint/Hold Breath, "
 						}
 						"settings"
 						{
@@ -272,7 +272,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button JOYSTICK_RIGHT, , "
+							"binding"		"xinput_button JOYSTICK_RIGHT, Melee, "
 						}
 					}
 				}
@@ -298,7 +298,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button DPAD_UP, , "
+							"binding"		"xinput_button DPAD_UP, Inventory, "
 						}
 						"settings"
 						{
@@ -318,7 +318,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button DPAD_DOWN, , "
+							"binding"		"xinput_button DPAD_DOWN, Inventory, "
 						}
 						"settings"
 						{
@@ -338,7 +338,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button DPAD_RIGHT, , "
+							"binding"		"xinput_button DPAD_RIGHT, Inventory, "
 						}
 						"settings"
 						{
@@ -358,7 +358,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button DPAD_LEFT, , "
+							"binding"		"xinput_button DPAD_LEFT, Inventory, "
 						}
 						"settings"
 						{
@@ -444,7 +444,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button JOYSTICK_RIGHT, , "
+							"binding"		"xinput_button JOYSTICK_RIGHT, Melee, "
 						}
 						"settings"
 						{
@@ -527,7 +527,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button shoulder_left, , "
+							"binding"		"xinput_button shoulder_left, Special Grenade, "
 						}
 					}
 				}
@@ -543,7 +543,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button shoulder_right, , "
+							"binding"		"xinput_button shoulder_right, Frag Grenade, "
 						}
 					}
 				}
@@ -559,7 +559,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button X, , "
+							"binding"		"xinput_button X, Use/Reload, "
 						}
 					}
 				}
@@ -575,7 +575,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button A, , "
+							"binding"		"xinput_button A, Stand/Jump, "
 						}
 					}
 				}
@@ -591,7 +591,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button B, , "
+							"binding"		"xinput_button B, Crouch/Prone, "
 						}
 					}
 				}

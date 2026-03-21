@@ -1,8 +1,8 @@
 "controller_mappings"
 {
 	"version"		"3"
-	"title"		"DeckOps - Gyro Controller - Toggle"
-	"description"		"M1 SP. WaW SP/ZM/MP, MW2 MP, BO! SP/ZM/MP, MW3 MP, and BO2 SP/ZM/MP Toggle"
+	"title"		"DeckOps - Gyro on ADS"
+	"description"		"MW1 SP, WaW SP/ZM/MP, MW2 MP, BO1 SP/ZM/MP, MW3 MP, BO2 SP/ZM/MP"
 	"controller_type"		"controller_neptune"
 	"group"
 	{
@@ -171,7 +171,7 @@
 	"group"
 	{
 		"id"		"2"
-		"mode"		"joystick_move"
+		"mode"		"joystick_camera"
 		"name"		""
 		"description"		""
 		"inputs"
@@ -185,6 +185,10 @@
 						"bindings"
 						{
 							"binding"		"xinput_button JOYSTICK_RIGHT, Melee, "
+						}
+						"settings"
+						{
+							"haptic_intensity"		"1"
 						}
 					}
 				}
@@ -223,10 +227,6 @@
 				}
 			}
 		}
-		"settings"
-		{
-			"deadzone_inner_radius"		"7199"
-		}
 	}
 	"group"
 	{
@@ -236,6 +236,26 @@
 		"description"		""
 		"inputs"
 		{
+			"click"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"xinput_button TRIGGER_LEFT, Aim Down Sight/Gyro, "
+						}
+						"settings"
+						{
+							"haptic_intensity"		"2"
+						}
+					}
+				}
+				"disabled_activators"
+				{
+				}
+			}
 		}
 		"settings"
 		{
@@ -250,6 +270,26 @@
 		"description"		""
 		"inputs"
 		{
+			"click"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"xinput_button TRIGGER_RIGHT, Fire Weapon, "
+						}
+						"settings"
+						{
+							"haptic_intensity"		"2"
+						}
+					}
+				}
+				"disabled_activators"
+				{
+				}
+			}
 		}
 		"settings"
 		{
@@ -258,7 +298,43 @@
 	}
 	"group"
 	{
-		"id"		"8"
+		"id"		"6"
+		"mode"		"absolute_mouse"
+		"name"		""
+		"description"		""
+		"inputs"
+		{
+			"click"
+			{
+				"activators"
+				{
+					"Soft_Press"
+					{
+						"bindings"
+						{
+							"binding"		"mouse_button LEFT, , "
+						}
+						"settings"
+						{
+							"haptic_intensity"		"1"
+						}
+					}
+				}
+				"disabled_activators"
+				{
+				}
+			}
+		}
+		"settings"
+		{
+			"sensitivity"		"523"
+			"acceleration"		"2"
+			"doubetap_max_duration"		"324"
+		}
+	}
+	"group"
+	{
+		"id"		"7"
 		"mode"		"joystick_move"
 		"name"		""
 		"description"		""
@@ -268,7 +344,7 @@
 			{
 				"activators"
 				{
-					"Full_Press"
+					"Soft_Press"
 					{
 						"bindings"
 						{
@@ -284,7 +360,24 @@
 	}
 	"group"
 	{
-		"id"		"9"
+		"id"		"8"
+		"mode"		"absolute_mouse"
+		"name"		""
+		"description"		""
+		"inputs"
+		{
+		}
+		"settings"
+		{
+			"gyro_natural_sensitivity"		"488"
+			"gyro_button"		"7"
+			"gyro_ratchet_button_mask"		"65536"
+			"gyro_button_invert"		"2"
+		}
+	}
+	"group"
+	{
+		"id"		"10"
 		"mode"		"dpad"
 		"name"		""
 		"description"		""
@@ -299,10 +392,6 @@
 						"bindings"
 						{
 							"binding"		"xinput_button DPAD_UP, Inventory, "
-						}
-						"settings"
-						{
-							"haptic_intensity"		"1"
 						}
 					}
 				}
@@ -320,10 +409,6 @@
 						{
 							"binding"		"xinput_button DPAD_DOWN, Inventory, "
 						}
-						"settings"
-						{
-							"haptic_intensity"		"1"
-						}
 					}
 				}
 				"disabled_activators"
@@ -339,10 +424,6 @@
 						"bindings"
 						{
 							"binding"		"xinput_button DPAD_RIGHT, Inventory, "
-						}
-						"settings"
-						{
-							"haptic_intensity"		"1"
 						}
 					}
 				}
@@ -360,10 +441,6 @@
 						{
 							"binding"		"xinput_button DPAD_LEFT, Inventory, "
 						}
-						"settings"
-						{
-							"haptic_intensity"		"1"
-						}
 					}
 				}
 				"disabled_activators"
@@ -379,58 +456,7 @@
 	}
 	"group"
 	{
-		"id"		"12"
-		"mode"		"absolute_mouse"
-		"name"		""
-		"description"		""
-		"inputs"
-		{
-			"click"
-			{
-				"activators"
-				{
-					"Soft_Press"
-					{
-						"bindings"
-						{
-							"binding"		"mouse_button LEFT, , "
-						}
-					}
-				}
-				"disabled_activators"
-				{
-				}
-			}
-		}
-	}
-	"group"
-	{
-		"id"		"13"
-		"mode"		"joystick_camera"
-		"name"		""
-		"description"		""
-		"inputs"
-		{
-		}
-	}
-	"group"
-	{
-		"id"		"14"
-		"mode"		"gyro_to_mouse"
-		"name"		""
-		"description"		""
-		"inputs"
-		{
-		}
-		"settings"
-		{
-			"gyro_button"		"7"
-			"gyro_ratchet_button_mask"		"65536"
-		}
-	}
-	"group"
-	{
-		"id"		"15"
+		"id"		"11"
 		"mode"		"joystick_move"
 		"name"		""
 		"description"		""
@@ -464,25 +490,7 @@
 	}
 	"group"
 	{
-		"id"		"16"
-		"mode"		"gyro_to_joystick"
-		"name"		""
-		"description"		""
-		"inputs"
-		{
-		}
-		"settings"
-		{
-			"gyro_natural_sensitivity"		"1600"
-			"acceleration"		"1"
-			"gyro_ratchet_button_mask"		"65536"
-			"gyro_button_invert"		"2"
-			"gyro_speed_to_joystick_min"		"0"
-		}
-	}
-	"group"
-	{
-		"id"		"7"
+		"id"		"9"
 		"mode"		"switches"
 		"name"		""
 		"description"		""
@@ -608,25 +616,18 @@
 		"name"		"Default"
 		"group_source_bindings"
 		{
-			"7"		"switch active"
+			"9"		"switch active"
 			"0"		"button_diamond active"
 			"1"		"left_trackpad active"
 			"2"		"right_trackpad inactive"
-			"8"		"right_trackpad inactive"
-			"12"		"right_trackpad active"
-			"13"		"right_trackpad inactive"
+			"6"		"right_trackpad active"
+			"7"		"right_trackpad inactive"
 			"3"		"joystick active"
 			"4"		"left_trigger active"
 			"5"		"right_trigger active"
-			"9"		"dpad active"
-			"14"		"gyro inactive"
-			"16"		"gyro active"
-			"15"		"right_joystick active"
+			"8"		"gyro active"
+			"10"		"dpad active"
+			"11"		"right_joystick active"
 		}
-	}
-	"settings"
-	{
-		"left_trackpad_mode"		"0"
-		"right_trackpad_mode"		"0"
 	}
 }
