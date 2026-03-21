@@ -65,6 +65,14 @@ GAMES = {
         "protocol": "plutonium://play/t6zm",
         "xact": False
     },
+    "t6sp":  {
+        "name": "Call of Duty: Black Ops II - Singleplayer",
+        "order": 6,
+        "appid": "202970",
+        "exe": "t6sp.exe",
+        "protocol": "steam",
+        "xact": False
+    },
     "iw5mp": {
         "name": "Call of Duty: Modern Warfare 3 (2011) - Multiplayer",
         "order": 5,
@@ -73,12 +81,28 @@ GAMES = {
         "protocol": "plutonium://play/iw5mp",
         "xact": False
     },
+    "iw5sp": {
+        "name": "Call of Duty: Modern Warfare 3 (2011) - Singleplayer",
+        "order": 5,
+        "appid": "42680",
+        "exe": "iw5sp.exe",
+        "protocol": "steam",
+        "xact": False
+    },
     "iw4mp": {
         "name": "Call of Duty: Modern Warfare 2 (2009) - Multiplayer",
         "order": 3,
         "appid": "10190",
         "exe": "iw4mp.exe",
         "protocol": "iw4x",
+        "xact": False
+    },
+    "iw4sp": {
+        "name": "Call of Duty: Modern Warfare 2 (2009) - Singleplayer",
+        "order": 3,
+        "appid": "10180",
+        "exe": "iw4sp.exe",
+        "protocol": "steam",
         "xact": False
     },
     "cod4mp": {

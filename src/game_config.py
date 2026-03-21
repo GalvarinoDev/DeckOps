@@ -30,7 +30,21 @@ CONFIGS_DIR  = os.path.join(PROJECT_ROOT, "assets", "configs")
 # Files are copied with their original filename preserved.
 
 def _compatdata(steam_root, appid):
-    """Return the compatdata path for a given appid."""
+    """
+    Return the compatdata path for a given appid.
+
+    Searches all Steam library folders (internal + SD card) so configs are
+    written to the correct prefix regardless of where the game is installed.
+    Falls back to steam_root if the prefix isn't found elsewhere.
+    """
+    from detect_games import _all_library_dirs
+
+    for steamapps_dir in _all_library_dirs(steam_root):
+        candidate = os.path.join(steamapps_dir, "compatdata", str(appid))
+        if os.path.isdir(candidate):
+            return candidate
+
+    # Fallback — prefix may not exist yet (os.makedirs will create it later)
     return os.path.join(steam_root, "steamapps", "compatdata", str(appid))
 
 
@@ -46,7 +60,7 @@ def _pfx_local(steam_root, appid, *parts):
 # The config map is built inside apply_game_configs so steam_root is available.
 # Keys that are absent for a given model are simply not included.
 
-_LCD_KEYS  = {"cod4sp", "cod4mp", "iw4sp", "iw4mp"}
+_LCD_KEYS  = {"cod4sp", "cod4mp", "iw4sp", "iw4mp", "iw5sp"}
 _OLED_KEYS = {"cod4sp", "cod4mp", "iw4sp", "iw4mp", "t4sp", "t4mp", "t5sp", "t5mp", "iw5sp", "iw5mp", "t6zm", "t6mp"}
 
 
@@ -219,11 +233,28 @@ def apply_game_configs(selected_keys, installed_games, steam_root,
     skipped  = 0
     failed   = 0
 
+    # ── Sibling key expansion ─────────────────────────────────────────────
+    # MW2 SP (iw4sp) and MW3 SP (iw5sp) have config entries but aren't
+    # tracked by detect_games / ALL_GAMES — they run through vanilla Steam.
+    # When their MP sibling is selected, auto-include the SP key so its
+    # display config also gets written.  The SP shares the same install_dir.
+    _SIBLING_MAP = {
+        "iw4mp": "iw4sp",   # MW2 MP  → MW2 SP
+        "iw5mp": "iw5sp",   # MW3 MP  → MW3 SP
+    }
+    expanded_keys = list(selected_keys)
+    for mp_key, sp_key in _SIBLING_MAP.items():
+        if mp_key in selected_keys and sp_key not in expanded_keys:
+            expanded_keys.append(sp_key)
+            # Re-use the MP game entry so the SP key has a valid install_dir
+            if mp_key in installed_games and sp_key not in installed_games:
+                installed_games[sp_key] = installed_games[mp_key]
+
     model_dir   = "OLED" if deck_model == "oled" else "LCD"
     allowed_keys = _OLED_KEYS if deck_model == "oled" else _LCD_KEYS
     config_map  = _build_config_map(steam_root)
 
-    for key in selected_keys:
+    for key in expanded_keys:
         if key not in allowed_keys:
             continue
         if key not in config_map:
