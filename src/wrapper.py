@@ -85,13 +85,22 @@ def get_proton_path(steam_root):
 def find_compatdata(steam_root, appid):
     """
     Find the Wine prefix folder for a given Steam appid.
+
+    Searches all Steam library folders (internal + SD card) so the correct
+    prefix is found regardless of where the game is installed.
     Returns the path or None if not found.
     """
-    compatdata = os.path.join(
-        steam_root, "steamapps", "compatdata", str(appid)
-    )
-    if os.path.exists(compatdata):
-        return compatdata
+    from detect_games import _all_library_dirs
+
+    for steamapps_dir in _all_library_dirs(steam_root):
+        candidate = os.path.join(steamapps_dir, "compatdata", str(appid))
+        if os.path.isdir(candidate):
+            return candidate
+
+    # Fallback to the default location (may not exist yet)
+    default = os.path.join(steam_root, "steamapps", "compatdata", str(appid))
+    if os.path.exists(default):
+        return default
     return None
 
 

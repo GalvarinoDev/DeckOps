@@ -43,14 +43,18 @@ _STEAM_CDN = "https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg"
 _HEADER_OVERRIDES = {
     10190:  "https://shared.steamstatic.com/store_item_assets/steam/apps/10180/header.jpg",
     202990: "https://shared.steamstatic.com/store_item_assets/steam/apps/202970/header.jpg",
+    42690:  "https://shared.steamstatic.com/store_item_assets/steam/apps/42680/header.jpg",
 }
 
 HEADER_APPIDS = [
     7940,
+    10180,
     10190,
+    42680,
     42690,
     10090,
     42700,
+    202970,
     202990,
 ]
 

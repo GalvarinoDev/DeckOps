@@ -66,40 +66,65 @@ def font(size=13, bold=False, weight=None, display=False):
     return f
 
 ALL_GAMES = [
-    {"base":"Call of Duty 4: Modern Warfare","keys":["cod4mp","cod4sp"],"appid":7940,"dev":"iw","client":"cod4x + iw3sp","plutonium":False,
+    {"base":"Call of Duty 4: Modern Warfare","keys":["cod4mp","cod4sp"],"appid":7940,"dev":"iw","client":"cod4x + iw3sp",
      "launch_note":"Launch Multiplayer and Singleplayer at least once through Steam before continuing."},
-    {"base":"Call of Duty: Modern Warfare 2","keys":["iw4mp"],"appid":10190,"dev":"iw","client":"iw4x","plutonium":False,
-     "launch_note":"CoD4 Multiplayer may need to be launched twice through Steam on first run."},
-    {"base":"Call of Duty: Modern Warfare 3","keys":["iw5mp"],"appid":42690,"dev":"iw","client":"plutonium","plutonium":True,
-     "launch_note":"CoD4 Multiplayer may need to be launched twice through Steam on first run."},
-    {"base":"Call of Duty: World at War","keys":["t4sp","t4mp"],"appid":10090,"dev":"trey","client":"plutonium","plutonium":True,
+    {"base":"Call of Duty: Modern Warfare 2","keys":["iw4mp","iw4sp"],"appid":10190,"dev":"iw","client":"iw4x",
+     "launch_note":"Launch Multiplayer through Steam at least once before continuing."},
+    {"base":"Call of Duty: Modern Warfare 3","keys":["iw5mp","iw5sp"],"appid":42690,"dev":"iw","client":"plutonium",
+     "lcd_keys":["iw5sp"],"lcd_client":"steam","lcd_appid":42680,
+     "launch_note":"Launch Multiplayer through Steam at least once before continuing."},
+    {"base":"Call of Duty: World at War","keys":["t4sp","t4mp"],"appid":10090,"dev":"trey","client":"plutonium",
+     "lcd_keys":[],
      "launch_note":"Launch both Campaign and Multiplayer through Steam before continuing."},
-    {"base":"Call of Duty: Black Ops","keys":["t5sp","t5mp"],"appid":42700,"dev":"trey","client":"plutonium","plutonium":True,
+    {"base":"Call of Duty: Black Ops","keys":["t5sp","t5mp"],"appid":42700,"dev":"trey","client":"plutonium",
+     "lcd_keys":[],
      "launch_note":"Launch both Campaign and Multiplayer through Steam before continuing."},
-    {"base":"Call of Duty: Black Ops II","keys":["t6mp","t6zm"],"appid":202990,"dev":"trey","client":"plutonium","plutonium":True,
-     "launch_note":"Launch both Multiplayer and Zombies through Steam before continuing."},
+    {"base":"Call of Duty: Black Ops II","keys":["t6mp","t6zm","t6sp"],"appid":202990,"dev":"trey","client":"plutonium",
+     "lcd_keys":["t6sp"],"lcd_client":"steam","lcd_appid":202970,
+     "launch_note":"Launch Multiplayer and Zombies through Steam before continuing."},
 ]
+
+def _active_keys(gd):
+    """Return the keys to show for this card based on the user's Deck model."""
+    if cfg.is_oled():
+        return gd["keys"]
+    return gd.get("lcd_keys", gd["keys"])
+
+def _active_client(gd):
+    """Return the client label for this card based on the user's Deck model."""
+    if cfg.is_oled():
+        return gd["client"]
+    return gd.get("lcd_client", gd["client"])
+
+def _active_appid(gd):
+    """Return the display appid for this card based on the user's Deck model."""
+    if cfg.is_oled():
+        return gd["appid"]
+    return gd.get("lcd_appid", gd["appid"])
 
 KEY_CLIENT = {
     "cod4mp": "cod4x",
     "cod4sp": "iw3sp",
     "iw4mp":  "iw4x",
+    "iw4sp":  "steam",
     "iw5mp":  "plutonium",
+    "iw5sp":  "steam",
     "t4sp":   "plutonium",
     "t4mp":   "plutonium",
     "t5sp":   "plutonium",
     "t5mp":   "plutonium",
     "t6zm":   "plutonium",
     "t6mp":   "plutonium",
+    "t6sp":   "steam",
 }
 
 KEY_EXES = {
     "cod4mp":"iw3mp.exe","cod4sp":"iw3sp.exe",
-    "iw4mp":"iw4mp.exe",
-    "iw5mp":"iw5mp.exe",
+    "iw4mp":"iw4mp.exe","iw4sp":"iw4sp.exe",
+    "iw5mp":"iw5mp.exe","iw5sp":"iw5sp.exe",
     "t4sp":"CoDWaW.exe","t4mp":"CoDWaWmp.exe",
     "t5sp":"BlackOps.exe","t5mp":"BlackOpsMP.exe",
-    "t6zm":"t6zm.exe","t6mp":"t6mp.exe",
+    "t6zm":"t6zm.exe","t6mp":"t6mp.exe","t6sp":"t6sp.exe",
 }
 
 def _is_prefix_ready(steam_root: str, appid: int) -> bool:
@@ -118,17 +143,22 @@ def _all_prefixes_ready(steam_root: str, gd: dict) -> bool:
     Check that ALL required Proton prefixes exist for a game card.
     Some games (BO1) have keys that map to different appids (42700 SP, 42710 MP)
     and both prefixes must exist before setup is safe to proceed.
+    Only checks keys active for the current Deck model.
     """
     from detect_games import GAMES
-    appids_needed = {GAMES[k]["appid"] for k in gd["keys"] if k in GAMES}
+    keys = _active_keys(gd)
+    appids_needed = {GAMES[k]["appid"] for k in keys if k in GAMES}
     return all(_is_prefix_ready(steam_root, aid) for aid in appids_needed)
 
 SP_IMAGE_URLS = {
     7940:   "https://shared.steamstatic.com/store_item_assets/steam/apps/7940/header.jpg",
+    10180:  "https://shared.steamstatic.com/store_item_assets/steam/apps/10180/header.jpg",
     10190:  "https://shared.steamstatic.com/store_item_assets/steam/apps/10180/header.jpg",
+    42680:  "https://shared.steamstatic.com/store_item_assets/steam/apps/42680/header.jpg",
     42690:  "https://shared.steamstatic.com/store_item_assets/steam/apps/42680/header.jpg",
     10090:  "https://shared.steamstatic.com/store_item_assets/steam/apps/10090/header.jpg",
     42700:  "https://shared.steamstatic.com/store_item_assets/steam/apps/42700/header.jpg",
+    202970: "https://shared.steamstatic.com/store_item_assets/steam/apps/202970/header.jpg",
     202990: "https://shared.steamstatic.com/store_item_assets/steam/apps/202970/header.jpg",
 }
 
@@ -340,7 +370,17 @@ class IntroScreen(QWidget):
         toggle_btn.clicked.connect(lambda: self._pick_gyro("toggle"))
         grow.addWidget(hold_btn); grow.addWidget(ads_btn); grow.addWidget(toggle_btn)
         gl.addLayout(grow)
+        back_row = QHBoxLayout()
+        gyro_back = _btn("← Back", C_DARK_BTN, size=11, h=36)
+        gyro_back.setFixedWidth(100)
+        gyro_back.clicked.connect(self._back_to_model)
+        back_row.addWidget(gyro_back); back_row.addStretch()
+        gl.addLayout(back_row)
         lay.addWidget(self._gyro_section)
+
+    def _back_to_model(self):
+        self._gyro_section.setVisible(False)
+        self._model_section.setVisible(True)
 
     def _pick_model(self, model):
         cfg.set_deck_model(model)
@@ -394,8 +434,11 @@ class WelcomeScreen(QWidget):
         libs = parse_library_folders(self.steam_root)
         self.installed = find_installed_games(libs)
         if not cfg.is_oled():
-            pk = {k for g in ALL_GAMES if g["plutonium"] for k in g["keys"]}
-            self.installed = {k:v for k,v in self.installed.items() if k not in pk}
+            # LCD: only keep keys that appear in at least one card's lcd_keys
+            lcd_allowed = set()
+            for g in ALL_GAMES:
+                lcd_allowed.update(g.get("lcd_keys", g["keys"]))
+            self.installed = {k:v for k,v in self.installed.items() if k in lcd_allowed}
         QTimer.singleShot(200, self._show_results)
 
     def _show_results(self):
@@ -455,11 +498,13 @@ class SetupScreen(QWidget):
             if item.widget(): item.widget().deleteLater()
         self._checks.clear()
         for gd in ALL_GAMES:
-            if gd["plutonium"] and not cfg.is_oled(): continue
-            ik = [k for k in gd["keys"] if k in self.installed]
+            keys = _active_keys(gd)
+            if not keys: continue
+            ik = [k for k in keys if k in self.installed]
             if not ik: continue
             base = gd["base"]; done = any(cfg.is_game_setup(k) for k in ik)
             color = C_IW if gd["dev"]=="iw" else C_TREY
+            client = _active_client(gd)
             
             # Check that ALL required prefixes exist (some games span multiple appids)
             prefix_ready = _all_prefixes_ready(self.steam_root, gd)
@@ -480,7 +525,7 @@ class SetupScreen(QWidget):
                 name = _lbl(base, 15, "#FFF", align=Qt.AlignLeft, wrap=False)
             
             self._checks[base] = (cb, gd)
-            badge = QPushButton(gd["client"].upper()); badge.setFont(font(10,True))
+            badge = QPushButton(client.upper()); badge.setFont(font(10,True))
             badge.setFixedSize(160,30); badge.setEnabled(False)
             badge.setStyleSheet(f"QPushButton{{background:{color};color:#FFF;border:none;border-radius:6px;}}QPushButton:disabled{{background:{color};color:#FFF;}}")
             row.addWidget(cb); row.addWidget(name, stretch=1); row.addWidget(badge)
@@ -500,7 +545,7 @@ class SetupScreen(QWidget):
         selected = []
         for base,(cb,gd) in self._checks.items():
             if not cb.isChecked(): continue
-            for key in gd["keys"]:
+            for key in _active_keys(gd):
                 if key in self.installed:
                     selected.append((key, gd, self.installed[key]))
         if not selected:
@@ -793,6 +838,13 @@ class InstallScreen(QWidget):
                 except Exception as ex:
                     self._s.log.emit(f"✗  {base_name} ({key}) failed: {ex}")
 
+        # ── Vanilla Steam games (no mod client — just configs + controllers) ──
+        for key, gd, game in self.selected:
+            c = KEY_CLIENT.get(key, "")
+            if c == "steam" and not cfg.is_game_setup(key):
+                cfg.mark_game_setup(key, "steam")
+                self._s.log.emit(f"✓  {gd['base']} ({key}) ready")
+
         # ── game display configs ──────────────────────────────────────────────
         try:
             from game_config import apply_game_configs
@@ -863,12 +915,14 @@ class ManagementCard(QFrame):
         super().__init__(parent)
         color = C_IW if gd["dev"] == "iw" else C_TREY
         self._color  = color
-        self._appid  = gd["appid"]
+        self._appid  = _active_appid(gd)
         self.setObjectName("MC")
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
-        ik         = [k for k in gd["keys"] if k in installed]
-        is_setup   = any(cfg.is_game_setup(k) for k in gd["keys"])
+        keys       = _active_keys(gd)
+        client     = _active_client(gd)
+        ik         = [k for k in keys if k in installed]
+        is_setup   = any(cfg.is_game_setup(k) for k in keys)
         is_present = len(ik) > 0
 
         border_color = color if is_setup else ("#445544" if is_present else "#333344")
@@ -890,18 +944,18 @@ class ManagementCard(QFrame):
         lay.addWidget(self._img)
         self._raw_pixmap = None
 
-        cached = _header_path(gd["appid"])
+        cached = _header_path(self._appid)
         if os.path.exists(cached):
             self._raw_pixmap = QPixmap(cached)
         else:
-            threading.Thread(target=self._fetch, args=(gd["appid"],), daemon=True).start()
+            threading.Thread(target=self._fetch, args=(self._appid,), daemon=True).start()
 
         badge_row = QWidget()
         badge_row.setStyleSheet(f"background:{C_CARD};border:none;")
         bl = QHBoxLayout(badge_row)
         bl.setContentsMargins(8, 4, 8, 4); bl.setSpacing(6)
 
-        client_lbl = QPushButton(gd["client"].upper())
+        client_lbl = QPushButton(client.upper())
         client_lbl.setFont(font(9, True)); client_lbl.setFixedHeight(22)
         client_lbl.setEnabled(False)
         client_lbl.setStyleSheet(
@@ -930,7 +984,7 @@ class ManagementCard(QFrame):
 
         if not is_present:
             inst_btn = _btn("Install on Steam", C_DARK_BTN, size=10, h=32)
-            inst_btn.clicked.connect(lambda _=None, aid=gd["appid"]: subprocess.Popen(
+            inst_btn.clicked.connect(lambda _=None, aid=self._appid: subprocess.Popen(
                 ["xdg-open", f"steam://install/{aid}"]))
             br.addWidget(inst_btn); br.addStretch()
         elif not is_setup:
@@ -938,15 +992,19 @@ class ManagementCard(QFrame):
             setup_btn.clicked.connect(lambda: on_setup(gd))
             br.addWidget(setup_btn); br.addStretch()
         else:
-            upd_btn = _btn("Update", C_DARK_BTN, size=10, h=32)
-            rei_btn = _btn("Reinstall", C_DARK_BTN, size=10, h=32)
+            # Only show Update/Reinstall for games with a mod client
+            has_mod = any(KEY_CLIENT.get(k, "") not in ("steam", "") for k in ik)
+            if has_mod:
+                upd_btn = _btn("Update", C_DARK_BTN, size=10, h=32)
+                rei_btn = _btn("Reinstall", C_DARK_BTN, size=10, h=32)
+                upd_btn.clicked.connect(lambda: on_update(gd, ik))
+                rei_btn.clicked.connect(lambda: on_reinstall(gd, ik))
+                br.addWidget(upd_btn); br.addWidget(rei_btn)
             fld_btn = _btn("Open Folder", C_DARK_BTN, size=10, h=32)
-            upd_btn.clicked.connect(lambda: on_update(gd, ik))
-            rei_btn.clicked.connect(lambda: on_reinstall(gd, ik))
             _idir = installed.get(ik[0], {}).get("install_dir", "") if ik else ""
             fld_btn.clicked.connect(lambda _=None, d=_idir: subprocess.Popen(
                 ["xdg-open", d]) if d else None)
-            br.addWidget(upd_btn); br.addWidget(rei_btn); br.addWidget(fld_btn); br.addStretch()
+            br.addWidget(fld_btn); br.addStretch()
 
         lay.addWidget(btn_row)
 
@@ -1028,8 +1086,7 @@ class ManagementScreen(QWidget):
             item = self._grid.takeAt(0)
             if item.widget(): item.widget().deleteLater()
 
-        is_oled = cfg.is_oled()
-        games   = [g for g in ALL_GAMES if not g["plutonium"] or is_oled]
+        games = [g for g in ALL_GAMES if _active_keys(g)]
 
         for idx, gd in enumerate(games):
             row = idx // CARD_COLS
