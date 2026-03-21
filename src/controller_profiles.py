@@ -9,11 +9,13 @@ Also patches configset_controller_neptune.vdf to set our template as the
 active default for each managed game, overriding any community config or
 workshop ID that Steam would otherwise use.
 
-Templates:
-    controller_neptune_deckops_hold.vdf         — gyro active while R5 held
-    controller_neptune_deckops_toggle.vdf        — R5 toggles gyro on/off
-    controller_neptune_deckops_other_hold.vdf    — KB+M with R5 hold gyro
-    controller_neptune_deckops_other_toggle.vdf  — KB+M with R5 toggle gyro
+Templates (2 variants × 3 schemes = 6 total):
+    controller_neptune_deckops_hold.vdf
+    controller_neptune_deckops_toggle.vdf
+    controller_neptune_deckops_ads.vdf
+    controller_neptune_deckops_other_hold.vdf
+    controller_neptune_deckops_other_toggle.vdf
+    controller_neptune_deckops_other_ads.vdf
 
 Must be called while Steam is closed.
 """
@@ -34,33 +36,33 @@ STEAM_CONFIG  = os.path.join(STEAM_DIR, "config", "config.vdf")
 TEMPLATES = [
     "controller_neptune_deckops_hold.vdf",
     "controller_neptune_deckops_toggle.vdf",
+    "controller_neptune_deckops_ads.vdf",
     "controller_neptune_deckops_other_hold.vdf",
     "controller_neptune_deckops_other_toggle.vdf",
+    "controller_neptune_deckops_other_ads.vdf",
 ]
 
 # ── Per-game profile assignment map ───────────────────────────────────────────
 #
-# "standard" — the user's hold/toggle choice (normal gamepad layout)
-# "other"    — the user's hold/toggle choice but KB+M variant (for SP campaigns
+# "standard" — the user's scheme choice (normal gamepad layout)
+# "other"    — the user's scheme choice but KB+M variant (for SP campaigns
 #              that need mouse-look via Steam Input)
 
 APPID_PROFILE_MAP = {
-    "7940":   "standard",  # CoD4 — SP only (IW3SP-MOD); MP (CoD4x) handled by non-Steam shortcut
-    "10090":  "standard",  # WaW  — Plutonium SP/ZM/MP
+    "7940":   "standard",  # CoD4 SP (IW3SP-MOD)
+    "10090":  "standard",  # WaW — Plutonium SP/ZM/MP
     "10180":  "other",     # MW2 SP — via Steam, KB+M layout
     "10190":  "standard",  # MW2 MP — iw4x
     "42680":  "other",     # MW3 SP — via Steam, KB+M layout
     "42690":  "standard",  # MW3 MP — Plutonium
     "42700":  "standard",  # BO1 SP/ZM — Plutonium
     "42710":  "standard",  # BO1 MP — Plutonium
-    "202970": "standard",       # BO2 SP — via Steam
-    "202990": "standard",       # BO2 MP — Plutonium
-    "212910": "standard",       # BO2 ZM — Plutonium
+    "202970": "standard",  # BO2 SP — via Steam
+    "202990": "standard",  # BO2 MP — Plutonium
+    "212910": "standard",  # BO2 ZM — Plutonium
 }
 
 # ── Named game keys used in configset_controller_neptune.vdf ──────────────────
-# Each appid may also appear under named keys in the configset file.
-# We patch both the numeric appid key AND any named keys.
 
 APPID_NAMED_KEYS = {
     "7940":   ["call of duty 4 modern warfare (2007)"],
@@ -117,11 +119,10 @@ def _get_deck_serial() -> str | None:
 
 def _profile_filename(profile_type: str, gyro_mode: str) -> list[str]:
     """Return the list of VDF filenames for a given profile type and gyro mode."""
-    suffix = gyro_mode
     if profile_type == "standard":
-        return [f"controller_neptune_deckops_{suffix}.vdf"]
+        return [f"controller_neptune_deckops_{gyro_mode}.vdf"]
     elif profile_type == "other":
-        return [f"controller_neptune_deckops_other_{suffix}.vdf"]
+        return [f"controller_neptune_deckops_other_{gyro_mode}.vdf"]
     return []
 
 
@@ -133,7 +134,7 @@ def _patch_configset(configset_path: str, key: str, template_name: str):
     entry = f'\t"{key}"\n\t{{\n\t\t"template"\t\t"{template_name}"\n\t}}\n'
 
     if not os.path.exists(configset_path):
-        # Create minimal file — note the leading quote on "controller_config"
+        os.makedirs(os.path.dirname(configset_path), exist_ok=True)
         with open(configset_path, "w", encoding="utf-8") as f:
             f.write('"controller_config"\n{\n' + entry + '}')
         return
@@ -141,14 +142,10 @@ def _patch_configset(configset_path: str, key: str, template_name: str):
     with open(configset_path, "r", encoding="utf-8", errors="replace") as f:
         content = f.read()
 
-    # Replace existing key block if present.
-    # Use re.DOTALL so the block interior matches across lines.
-    # \{{ and \}} are literal braces in the regex (escaped for f-string then regex).
     pattern = rf'\t"{re.escape(key)}"\n\t\{{[^}}]*\}}\n?'
     if re.search(pattern, content, re.MULTILINE | re.DOTALL):
         content = re.sub(pattern, entry, content, flags=re.MULTILINE | re.DOTALL)
     else:
-        # Insert before closing brace of root block
         content = content.rstrip()
         if content.endswith("}"):
             content = content[:-1].rstrip() + "\n" + entry + "}\n"
@@ -189,21 +186,15 @@ def assign_controller_profiles(gyro_mode: str, on_progress=None):
     """
     Assign DeckOps controller profiles for all managed games.
 
-    Writes to three places:
-      1. userdata/.../controller_config/<appid>/ — shows in Your Layouts
-      2. Steam Controller Configs/.../config/<appid>/controller_neptune.vdf
-      3. Patches configset_controller_neptune.vdf and configset_<serial>.vdf
-         to set our template as the active default — this is what Steam reads.
-
-    gyro_mode — "hold" or "toggle"
+    gyro_mode — "hold", "toggle", or "ads"
     Must be called while Steam is closed.
     """
     def prog(msg):
         if on_progress:
             on_progress(msg)
 
-    if gyro_mode not in ("hold", "toggle"):
-        prog(f"  ⚠ Invalid gyro_mode '{gyro_mode}' — must be 'hold' or 'toggle'.")
+    if gyro_mode not in ("hold", "toggle", "ads"):
+        prog(f"  ⚠ Invalid gyro_mode '{gyro_mode}' — must be 'hold', 'toggle', or 'ads'.")
         return
 
     uids = _find_all_steam_uids()
@@ -238,7 +229,7 @@ def assign_controller_profiles(gyro_mode: str, on_progress=None):
                 prog(f"  ⚠ Asset missing, skipping: {primary_filename}")
                 continue
 
-            # ── Path 1: userdata controller_config (Your Layouts) ─────────────
+            # Path 1: userdata controller_config (Your Layouts)
             dest_dir = os.path.join(config_root, appid)
             os.makedirs(dest_dir, exist_ok=True)
             for filename in filenames:
@@ -247,18 +238,16 @@ def assign_controller_profiles(gyro_mode: str, on_progress=None):
                 if os.path.exists(src):
                     shutil.copy2(src, dest)
 
-            # ── Path 2: numbered appid folder — controller_neptune.vdf ────────
+            # Path 2: numbered appid folder — controller_neptune.vdf
             cfg_dir_num = os.path.join(steam_cfg_root, appid)
             os.makedirs(cfg_dir_num, exist_ok=True)
             shutil.copy2(src_primary, os.path.join(cfg_dir_num, "controller_neptune.vdf"))
 
-            # ── Path 3: patch configset files — this sets the active default ──
-            # Patch numeric appid key
+            # Path 3: patch configset files — this sets the active default
             _patch_configset(configset_neptune, appid, primary_filename)
             if configset_serial:
                 _patch_configset(configset_serial, appid, primary_filename)
 
-            # Patch named game keys
             for named_key in APPID_NAMED_KEYS.get(appid, []):
                 _patch_configset(configset_neptune, named_key, primary_filename)
                 if configset_serial:

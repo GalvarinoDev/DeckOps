@@ -328,14 +328,17 @@ class IntroScreen(QWidget):
         gl.addWidget(_lbl("How do you want to activate gyro aiming?", 15, "#CCC"))
         gl.addWidget(_lbl(
             "Hold  —  gyro is active while R5 (right grip) is held down.\n"
+            "ADS  —  gyro activates when you aim down sights.\n"
             "Toggle  —  press R5 once to turn gyro on, press again to turn it off.",
             13, C_DIM, align=Qt.AlignLeft))
         grow = QHBoxLayout(); grow.setSpacing(20)
-        hold_btn   = _btn("Hold", C_DARK_BTN, h=56)
+        hold_btn   = _btn("Hold",   C_DARK_BTN, h=56)
+        ads_btn    = _btn("ADS",    C_DARK_BTN, h=56)
         toggle_btn = _btn("Toggle", C_DARK_BTN, h=56)
         hold_btn.clicked.connect(lambda: self._pick_gyro("hold"))
+        ads_btn.clicked.connect(lambda: self._pick_gyro("ads"))
         toggle_btn.clicked.connect(lambda: self._pick_gyro("toggle"))
-        grow.addWidget(hold_btn); grow.addWidget(toggle_btn)
+        grow.addWidget(hold_btn); grow.addWidget(ads_btn); grow.addWidget(toggle_btn)
         gl.addLayout(grow)
         lay.addWidget(self._gyro_section)
 
@@ -630,27 +633,6 @@ class InstallScreen(QWidget):
                     _compat_applied = True
                 except Exception as ex:
                     self._s.log.emit(f"  CompatToolMapping skipped: {ex}")
-
-        def _write_launch_options():
-            try:
-                from wrapper import set_launch_options
-                if has_iw4x:
-                    set_launch_options(
-                        self.steam_root,
-                        "10190",
-                        "bash -c 'exec \"${@/iw4mp.exe/iw4x.exe}\"' -- %command%",
-                    )
-                    self._s.log.emit("✓  MW2 launch option written")
-                if has_cod4:
-                    set_launch_options(
-                        self.steam_root,
-                        "7940",
-                        "bash -c 'exec \"${@/iw3sp.exe/iw3sp_mod.exe}\"' -- %command%",
-                    )
-                    self._s.log.emit("✓  CoD4 SP launch option written")
-            except Exception as ex:
-                self._s.log.emit(f"  Launch options skipped: {ex}")
-
         _launch_defaults_set = False
         def _set_launch_defaults():
             nonlocal _launch_defaults_set
@@ -726,16 +708,10 @@ class InstallScreen(QWidget):
                 self._plut_event.wait()
                 self._s.plut_go.emit()
 
-        # ── Write launch options before kill so they sync to cloud on shutdown ─
-        _write_launch_options()
-
         # ── Kill Steam once — everything from here runs with Steam closed ─────
         _kill_steam_once()
         _apply_compat()
         _set_launch_defaults()
-
-        # ── Write launch options again — local file, Steam fully dead ─────────
-        _write_launch_options()
 
         # ── Plutonium games ───────────────────────────────────────────────────
         if has_plut:
@@ -953,8 +929,10 @@ class ManagementCard(QFrame):
         br = QHBoxLayout(btn_row); br.setContentsMargins(8, 6, 8, 8); br.setSpacing(6)
 
         if not is_present:
-            na = _lbl("Not installed", 10, "#554455", wrap=False)
-            br.addWidget(na); br.addStretch()
+            inst_btn = _btn("Install on Steam", C_DARK_BTN, size=10, h=32)
+            inst_btn.clicked.connect(lambda _=None, aid=gd["appid"]: subprocess.Popen(
+                ["xdg-open", f"steam://install/{aid}"]))
+            br.addWidget(inst_btn); br.addStretch()
         elif not is_setup:
             setup_btn = _btn("Set Up", C_IW, size=10, h=32)
             setup_btn.clicked.connect(lambda: on_setup(gd))
@@ -962,9 +940,13 @@ class ManagementCard(QFrame):
         else:
             upd_btn = _btn("Update", C_DARK_BTN, size=10, h=32)
             rei_btn = _btn("Reinstall", C_DARK_BTN, size=10, h=32)
+            fld_btn = _btn("Open Folder", C_DARK_BTN, size=10, h=32)
             upd_btn.clicked.connect(lambda: on_update(gd, ik))
             rei_btn.clicked.connect(lambda: on_reinstall(gd, ik))
-            br.addWidget(upd_btn); br.addWidget(rei_btn); br.addStretch()
+            _idir = installed.get(ik[0], {}).get("install_dir", "") if ik else ""
+            fld_btn.clicked.connect(lambda _=None, d=_idir: subprocess.Popen(
+                ["xdg-open", d]) if d else None)
+            br.addWidget(upd_btn); br.addWidget(rei_btn); br.addWidget(fld_btn); br.addStretch()
 
         lay.addWidget(btn_row)
 
@@ -1161,30 +1143,30 @@ class ControllerInfoScreen(QWidget):
         lay.addWidget(self._gyro_lbl)
         lay.addWidget(_lbl(
             "Newest GE-Proton installed and set for all games. "
-            "Change Hold / Toggle anytime in Settings -> Re-apply Controller Profiles.",
+            "Change Hold, ADS, or Toggle anytime in Settings — Re-apply Controller Profiles.",
             11, "#666", align=Qt.AlignLeft))
 
         lay.addStretch()
 
         lay.addWidget(_lbl(
-            "Switching to Game Mode may take a moment — do not turn off your Steam Deck during the transition.",
+            "Launch each modded game at least once before going online — Steam Cloud may overwrite your setup if you launch Desktop Mode first.",
             11, C_TREY, align=Qt.AlignCenter))
         lay.addSpacing(4)
 
-        brow = QHBoxLayout(); brow.setSpacing(16)
-        cont = _btn("Switch to Game Mode  >>", C_IW, h=52)
-        cont.clicked.connect(self._launch_steam)
-        mgmt = _btn("My Games", C_DARK_BTN, h=52)
-        mgmt.setFixedWidth(180)
-        mgmt.clicked.connect(self._go_management)
-        brow.addWidget(mgmt); brow.addWidget(cont, stretch=1)
-        cw = QHBoxLayout(); cw.addStretch(); cw.addLayout(brow, stretch=1); cw.addStretch()
+        cont = _btn("Continue  >>", C_IW, h=52)
+        cont.clicked.connect(self._reopen_steam)
+        cw = QHBoxLayout(); cw.addStretch(); cw.addWidget(cont, stretch=1); cw.addStretch()
         lay.addLayout(cw)
 
     def showEvent(self, e):
         super().showEvent(e)
         gyro_mode = cfg.get_gyro_mode() or "hold"
-        gyro_desc = "R5 held" if gyro_mode == "hold" else "R5 toggles"
+        if gyro_mode == "hold":
+            gyro_desc = "R5 held"
+        elif gyro_mode == "ads":
+            gyro_desc = "aim down sights"
+        else:
+            gyro_desc = "R5 toggles"
         self._gyro_lbl.setText(
             f"Standard gamepad layout with gyro aiming ({gyro_desc}) assigned to all games. "
         )
@@ -1194,20 +1176,16 @@ class ControllerInfoScreen(QWidget):
         self.stack.widget(5).set_installed(find_installed_games(parse_library_folders(root)))
         self.stack.setCurrentIndex(5)
 
-    def _launch_steam(self):
+    def _reopen_steam(self):
         try:
-            subprocess.Popen(["steamos-session-select", "gamescope"], start_new_session=True)
+            steam_root = cfg.load().get("steam_root", "") or find_steam_root()
+            steam_sh = os.path.join(steam_root, "steam.sh") if steam_root else None
+            if steam_sh and os.path.exists(steam_sh):
+                subprocess.Popen([steam_sh], start_new_session=True)
+            else:
+                subprocess.Popen(["steam"], start_new_session=True)
         except Exception:
-            # Fallback for non-SteamOS or if the command isn't available
-            try:
-                steam_root = cfg.load().get("steam_root", "") or find_steam_root()
-                steam_sh = os.path.join(steam_root, "steam.sh") if steam_root else None
-                if steam_sh and os.path.exists(steam_sh):
-                    subprocess.Popen([steam_sh], start_new_session=True)
-                else:
-                    subprocess.Popen(["steam"], start_new_session=True)
-            except Exception:
-                pass
+            pass
         root = find_steam_root()
         self.stack.widget(5).set_installed(find_installed_games(parse_library_folders(root)))
         self.stack.setCurrentIndex(5)
@@ -1259,9 +1237,11 @@ class ConfigureScreen(QWidget):
 
         lay.addWidget(_lbl("Shortcuts & Proton", 14, "#CCC", align=Qt.AlignLeft))
         sr = QHBoxLayout(); sr.setSpacing(12)
-        shortcut_btn = _btn("Repair Shortcuts", C_DARK_BTN, size=12, h=40)
+        shortcut_btn  = _btn("Repair Shortcuts",     C_DARK_BTN, size=12, h=40)
+        gamecfg_btn   = _btn("Re-apply Game Configs", C_DARK_BTN, size=12, h=40)
         shortcut_btn.clicked.connect(self._repair_shortcuts)
-        sr.addWidget(shortcut_btn); sr.addStretch()
+        gamecfg_btn.clicked.connect(self._reapply_game_configs)
+        sr.addWidget(shortcut_btn); sr.addWidget(gamecfg_btn); sr.addStretch()
         lay.addLayout(sr)
         lay.addWidget(_hdiv())
 
@@ -1411,6 +1391,43 @@ class ConfigureScreen(QWidget):
                 s.log.emit(f"✗  Failed: {ex}")
                 s.done.emit(False)
         threading.Thread(target=_run, daemon=True).start()
+
+    def _reapply_game_configs(self):
+        self.status.setText("Re-applying game configs...")
+        s = _Sigs()
+        s.log.connect(lambda msg: self.status.setText(msg))
+        s.done.connect(lambda ok: self.status.setText(
+            "✓  Game configs applied." if ok else "✗  Failed — check that Steam is closed."
+        ))
+        def _run():
+            try:
+                from game_config import apply_game_configs
+                from detect_games import find_installed_games, parse_library_folders
+                steam_root = cfg.load().get("steam_root", "") or find_steam_root()
+                if not steam_root:
+                    s.log.emit("✗  Steam not found.")
+                    s.done.emit(False)
+                    return
+                installed = find_installed_games(parse_library_folders(steam_root))
+                setup_keys = list(cfg.get_setup_games().keys())
+                applied, skipped, failed = apply_game_configs(
+                    selected_keys=setup_keys,
+                    installed_games=installed,
+                    steam_root=steam_root,
+                    deck_model=cfg.get_deck_model() or "oled",
+                    on_progress=lambda msg: s.log.emit(msg),
+                )
+                s.log.emit(
+                    f"✓  {applied} config(s) applied"
+                    + (f", {skipped} skipped" if skipped else "")
+                    + (f", {failed} failed" if failed else "")
+                )
+                s.done.emit(failed == 0)
+            except Exception as ex:
+                s.log.emit(f"✗  Failed: {ex}")
+                s.done.emit(False)
+        threading.Thread(target=_run, daemon=True).start()
+
 
 
 # ── UpdateScreen ───────────────────────────────────────────────────────────────
