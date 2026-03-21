@@ -58,7 +58,7 @@ Plutonium games require a [free account](https://forum.plutonium.pw/register) to
    - **Already installed:** A menu appears - choose to Launch, Reinstall, or Uninstall
 
 ![DeckOps demo](https://github.com/user-attachments/assets/fad3c437-137e-411c-9dee-a14f4983e1a6)
-*Mock up of the alpha build during install.*
+*Example of the alpha build during install, more features have been added but ease of install remains the same.*
 
 > Your Steam games are never touched. Only files created by DeckOps are removed during uninstall.
 
