@@ -5,7 +5,7 @@ Copies pre-built config files from assets/configs/LCD or assets/configs/OLED
 into the correct destination paths for each game. Overwrites whatever is
 currently there.
 
-LCD users only receive MW1 and MW2 configs.
+LCD users receive MW1, MW2, and MW3 SP configs.
 OLED users receive MW1, MW2, WaW, BO1, MW3, and BO2 configs.
 """
 

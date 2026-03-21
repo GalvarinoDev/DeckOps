@@ -226,12 +226,14 @@ echo ""
 
 info "Removing DeckOps Deck configurator launch defaults from localconfig.vdf..."
 
+# Mirrors: wrapper.py set_default_launch_option()
 python3 - << 'PYEOF'
 import os, re
 
 # Appids whose DefaultLaunchOption DeckOps writes via set_default_launch_option.
 # These live in the Deck_ConfiguratorInterstitialApps "apps" block, not the
 # standard LaunchOptions flat key, so they need separate removal.
+# See: wrapper.py set_default_launch_option() for the write side.
 DECK_APPIDS = {"7940", "10090"}
 
 steam_dir = os.path.expanduser("~/.local/share/Steam")
@@ -357,6 +359,7 @@ echo ""
 
 info "Removing DeckOps non-Steam shortcuts from Steam library..."
 
+# Mirrors: shortcut.py SHORTCUTS and the binary VDF format from _make_shortcut_entry()
 remove_steam_shortcuts() {
     python3 - << 'PYEOF'
 import os, struct
@@ -489,10 +492,11 @@ echo ""
 
 info "Removing non-Steam shortcut artwork from Steam grid..."
 
+# Mirrors: shortcut.py _download_artwork() and _calc_shortcut_appid()
 python3 - << 'PYEOF'
 import os, re, binascii, glob
 
-# Shortcut definitions — must match shortcut.py
+# Shortcut definitions — must match shortcut.py SHORTCUTS
 SHORTCUTS = {
     "cod4mp": {
         "name":       "Call of Duty 4: Modern Warfare - Multiplayer",
@@ -596,6 +600,10 @@ echo ""
 
 info "Removing per-game controller configs..."
 
+# Mirrors: controller_profiles.py assign_controller_profiles() and
+#          shortcut.py _assign_controller_config()
+# If you change APPID_NAMED_KEYS or MANAGED_STEAM_APPIDS in the source
+# files, update the copies here too or uninstall will miss entries.
 python3 - << 'PYEOF'
 import os, shutil, re, binascii, glob
 
@@ -772,6 +780,7 @@ echo ""
 
 info "Removing DeckOps CompatToolMapping entries from Steam config..."
 
+# Mirrors: wrapper.py set_compat_tool() and ge_proton.py MANAGED_APPIDS
 python3 - << 'PYEOF'
 import os, re, binascii, glob
 

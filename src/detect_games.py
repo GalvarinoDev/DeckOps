@@ -16,6 +16,15 @@ SD_CARD_PATTERNS = [
     "/run/media/mmcblk0p1",
 ]
 
+# Maps game key to metadata for each supported title.
+#
+# Most games use a mod client (cod4x, iw4x, plutonium) and have a protocol
+# URL that the wrapper script launches. Games with protocol "steam" are
+# vanilla Steam titles with no mod client. They're tracked here so DeckOps
+# can detect them, apply display configs, assign controller profiles, and
+# show them on the right cards in the UI. They don't get a wrapper script
+# or any exe replacement.
+
 GAMES = {
     "t4sp":  {
         "name": "Call of Duty: World at War",

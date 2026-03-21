@@ -105,6 +105,10 @@ def install_iw3sp(game: dict, steam_root: str,
     iw3sp_mod = os.path.join(install_dir, "iw3sp_mod.exe")
 
     # Rename iw3sp.exe -> iw3sp.exe.bak (only if not already done)
+    # This is how Steam launches IW3SP-MOD transparently. Steam always runs
+    # iw3sp.exe, so by putting the mod exe in its place we avoid needing
+    # launch options or localconfig.vdf writes. The backup lets us restore
+    # the original on uninstall.
     prog(80, "Replacing iw3sp.exe...")
     if os.path.exists(iw3sp) and not os.path.exists(iw3sp_bak):
         os.rename(iw3sp, iw3sp_bak)
