@@ -1185,11 +1185,27 @@ class ControllerInfoScreen(QWidget):
             else:
                 subprocess.Popen(["steam"], start_new_session=True)
         except Exception:
-            pass
+            try:
+                subprocess.Popen(["steam"], start_new_session=True)
+            except Exception:
+                pass
         root = find_steam_root()
         self.stack.widget(5).set_installed(find_installed_games(parse_library_folders(root)))
         self.stack.setCurrentIndex(5)
 
+
+def _reopen_steam_bg(steam_root=None):
+    """Reopen Steam in the background after a settings operation."""
+    try:
+        if not steam_root:
+            steam_root = find_steam_root()
+        steam_sh = os.path.join(steam_root, "steam.sh") if steam_root else None
+        if steam_sh and os.path.exists(steam_sh):
+            subprocess.Popen([steam_sh], start_new_session=True)
+        else:
+            subprocess.Popen(["steam"], start_new_session=True)
+    except Exception:
+        pass
 
 # ── ConfigureScreen ────────────────────────────────────────────────────────────
 class ConfigureScreen(QWidget):
@@ -1328,7 +1344,9 @@ class ConfigureScreen(QWidget):
         def _run():
             try:
                 from controller_profiles import install_controller_templates, assign_controller_profiles
-                from wrapper import set_steam_input_enabled
+                from wrapper import kill_steam, set_steam_input_enabled
+                s.log.emit("Closing Steam...")
+                kill_steam()
                 install_controller_templates(
                     on_progress=lambda msg: s.log.emit(msg)
                 )
@@ -1341,6 +1359,7 @@ class ConfigureScreen(QWidget):
                 if sr:
                     set_steam_input_enabled(sr)
                 s.done.emit(True)
+                _reopen_steam_bg(sr)
             except Exception as ex:
                 s.log.emit(f"✗  Failed: {ex}")
                 s.done.emit(False)
@@ -1361,13 +1380,16 @@ class ConfigureScreen(QWidget):
         def _run():
             try:
                 from shortcut import create_shortcuts, SHORTCUTS
-                from wrapper import set_steam_input_enabled
+                from wrapper import kill_steam, set_steam_input_enabled
                 
                 steam_root = cfg.load().get("steam_root", "") or find_steam_root()
                 if not steam_root:
                     s.log.emit("✗  Steam not found.")
                     s.done.emit(False)
                     return
+                
+                s.log.emit("Closing Steam...")
+                kill_steam()
                 
                 libs = parse_library_folders(steam_root)
                 installed = find_installed_games(libs)
@@ -1376,6 +1398,7 @@ class ConfigureScreen(QWidget):
                 if not shortcut_keys:
                     s.log.emit("No shortcut-eligible games found.")
                     s.done.emit(True)
+                    _reopen_steam_bg(steam_root)
                     return
                 
                 gyro_mode = cfg.get_gyro_mode() or "hold"
@@ -1387,6 +1410,7 @@ class ConfigureScreen(QWidget):
                 )
                 set_steam_input_enabled(steam_root)
                 s.done.emit(True)
+                _reopen_steam_bg(steam_root)
             except Exception as ex:
                 s.log.emit(f"✗  Failed: {ex}")
                 s.done.emit(False)
@@ -1403,11 +1427,14 @@ class ConfigureScreen(QWidget):
             try:
                 from game_config import apply_game_configs
                 from detect_games import find_installed_games, parse_library_folders
+                from wrapper import kill_steam
                 steam_root = cfg.load().get("steam_root", "") or find_steam_root()
                 if not steam_root:
                     s.log.emit("✗  Steam not found.")
                     s.done.emit(False)
                     return
+                s.log.emit("Closing Steam...")
+                kill_steam()
                 installed = find_installed_games(parse_library_folders(steam_root))
                 setup_keys = list(cfg.get_setup_games().keys())
                 applied, skipped, failed = apply_game_configs(
@@ -1423,6 +1450,7 @@ class ConfigureScreen(QWidget):
                     + (f", {failed} failed" if failed else "")
                 )
                 s.done.emit(failed == 0)
+                _reopen_steam_bg(steam_root)
             except Exception as ex:
                 s.log.emit(f"✗  Failed: {ex}")
                 s.done.emit(False)
@@ -1492,6 +1520,7 @@ class UpdateScreen(QWidget):
     def _on_done(self, _):
         self.cur.setText("Done!")
         self.back_btn.setVisible(True)
+        _reopen_steam_bg(cfg.load().get("steam_root", "") or find_steam_root())
 
     def _go_back(self):
         root = find_steam_root()
@@ -1505,20 +1534,15 @@ class UpdateScreen(QWidget):
         from iw3sp import install_iw3sp
         from plutonium import install_plutonium
 
-        has_cod4 = any(KEY_CLIENT.get(k) in ("cod4x", "iw3sp") for k, _, _ in self.selected)
-        has_iw4x = any(KEY_CLIENT.get(k) == "iw4x" for k, _, _ in self.selected)
-        proton   = get_proton_path(self.steam_root)
-        total    = len(self.selected)
+        has_cod4  = any(KEY_CLIENT.get(k) in ("cod4x", "iw3sp") for k, _, _ in self.selected)
+        has_iw4x  = any(KEY_CLIENT.get(k) == "iw4x" for k, _, _ in self.selected)
+        has_plut  = any(KEY_CLIENT.get(k) == "plutonium" for k, _, _ in self.selected)
+        proton    = get_proton_path(self.steam_root)
+        total     = len(self.selected)
 
-        if has_cod4 or has_iw4x:
-            self._s.log.emit(
-                "Steam must be closed to continue.\n"
-                "  1. Close Steam completely\n"
-                "  2. Click the button below to continue"
-            )
-            self._s.plut_wait.emit()
-            self._steam_closed.wait()
-            self._s.plut_go.emit()
+        if not has_plut:
+            self._s.progress.emit(5, "Closing Steam...")
+            self._s.log.emit("Closing Steam...")
             try:
                 kill_steam()
                 self._s.log.emit("  ✓ Steam closed.")
