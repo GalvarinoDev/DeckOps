@@ -4,15 +4,6 @@
 	"title"		"DeckOps - Gyro Other - Hold"
 	"description"		"MW1 MP, MW2 SP, and MW3 SP"
 	"controller_type"		"controller_neptune"
-	"major_revision"		"0"
-	"minor_revision"		"0"
-	"localization"
-	{
-		"english"
-		{
-			"title"		"Keyboard (WASD) and Mouse"
-			"description"		"This template works great for the games on Steam that were designed with a keyboard and mouse in mind, without real gamepad support. The controller will drive the game's keyboard based events with buttons, but will make assumptions about which buttons move you around (WASD for movement, space for jump, etc.). The right pad will emulate the movement of a mouse."
-		}
 		"czech"
 		{
 			"title"		"Klávesnice (WASD) a myš"
@@ -360,7 +351,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"key_press E, Melee, , "
+							"binding"		"mouse_button LEFT, , "
 						}
 						"settings"
 						{
@@ -756,7 +747,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"key_press E, Melee, , "
+							"binding"		"mouse_button LEFT, , "
 						}
 						"settings"
 						{
@@ -884,7 +875,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"game_action 1 1027, Gyro Aim (Hold), , "
+							"binding"		"game_action 1 1027, Gyro Hold, , "
 						}
 					}
 				}
