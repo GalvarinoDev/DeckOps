@@ -1187,8 +1187,6 @@ class ControllerInfoScreen(QWidget):
         gyro_desc = "R5 held" if gyro_mode == "hold" else "R5 toggles"
         self._gyro_lbl.setText(
             f"Standard gamepad layout with gyro aiming ({gyro_desc}) assigned to all games. "
-            f"Note: Black Ops II MP and Zombies use a dedicated layout that does not support "
-            f"dual input — gyro feel may differ from other titles."
         )
 
     def _go_management(self):
