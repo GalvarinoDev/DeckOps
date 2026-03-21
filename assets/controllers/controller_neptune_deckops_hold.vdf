@@ -1,8 +1,8 @@
 "controller_mappings"
 {
 	"version"		"3"
-	"title"		"DeckOps - Gyro Controller - BO2 Hold"
-	"description"		"ZM + MP BO2 Gyro Hold"
+	"title"		"DeckOps - Gyro Controller - Hold"
+	"description"		"M1 SP. WaW SP/ZM/MP, MW2 MP, BO! SP/ZM/MP, MW3 MP, and BO2 SP/ZM/MP Gyro"
 	"controller_type"		"controller_neptune"
 	"group"
 	{

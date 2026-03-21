@@ -1,8 +1,8 @@
 "controller_mappings"
 {
 	"version"		"3"
-	"title"		"DeckOps - Gyro Controller - BO2 Toggle"
-	"description"		"ZM + MP BO2 Gyro Toggle"
+	"title"		"DeckOps - Gyro Controller - Toggle"
+	"description"		"M1 SP. WaW SP/ZM/MP, MW2 MP, BO! SP/ZM/MP, MW3 MP, and BO2 SP/ZM/MP Toggle"
 	"controller_type"		"controller_neptune"
 	"group"
 	{
