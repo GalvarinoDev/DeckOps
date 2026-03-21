@@ -610,13 +610,17 @@ MANAGED_STEAM_APPIDS = [
 ]
 
 # Named game keys used in configset files — must match controller_profiles.py
+# Includes BOTH old (pre-fix) and new named keys so uninstall cleans up
+# regardless of which version the user installed with.
 APPID_NAMED_KEYS = {
     "7940":   ["call of duty 4 modern warfare (2007)"],
     "10090":  ["call of duty world at war",
                "call of duty world at war - multiplayer"],
-    "10180":  ["call of duty modern warfare 2 (2009) - multiplayer"],
+    "10180":  ["call of duty modern warfare 2 (2009)",
+               "call of duty modern warfare 2 (2009) - multiplayer"],
     "10190":  ["call of duty modern warfare 2 (2009) - multiplayer"],
-    "42680":  ["call of duty modern warfare 3 - multiplayer"],
+    "42680":  ["call of duty modern warfare 3",
+               "call of duty modern warfare 3 - multiplayer"],
     "42690":  ["call of duty modern warfare 3 - multiplayer"],
     "42700":  ["call of duty black ops",
                "call of duty black ops - zombies"],
