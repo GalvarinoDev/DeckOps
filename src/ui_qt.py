@@ -638,14 +638,14 @@ class InstallScreen(QWidget):
                     set_launch_options(
                         self.steam_root,
                         "10190",
-                        "bash -c 'exec \"${@/iw4mp.exe/iw4x.exe}\"' -- %command%",
+                        "",
                     )
                     self._s.log.emit("✓  MW2 launch option written")
                 if has_cod4:
                     set_launch_options(
                         self.steam_root,
                         "7940",
-                        "bash -c 'exec \"${@/iw3sp.exe/iw3sp_mod.exe}\"' -- %command%",
+                        "",
                     )
                     self._s.log.emit("✓  CoD4 SP launch option written")
             except Exception as ex:
