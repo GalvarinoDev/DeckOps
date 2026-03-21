@@ -43,7 +43,7 @@ DeckOps automates the installation of CoD4x, IW3SP-MOD, iw4x, T6SP-Mod, and Plut
 ## ⚠️ Before You Install
 Before running DeckOps, launch each game through Steam in every mode that includes has a custom client shown in the table above. This creates the folders needed and starts shader cache downloads. Skipping this is the most common cause of install failures.
 
-Plutonium games require a free account:[create a Plutonium Acccount](https://forum.plutonium.pw/register).
+Plutonium games require a [free account](https://forum.plutonium.pw/register) to play online.
 
 ---
 
