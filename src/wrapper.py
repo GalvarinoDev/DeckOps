@@ -253,6 +253,71 @@ def set_launch_options(steam_root, appid, options):
             f.write(new_content)
 
 
+def clear_launch_options(steam_root, appid):
+    """
+    Remove any LaunchOptions for a Steam game in localconfig.vdf.
+
+    Cleans up stale launch options left over from older DeckOps versions
+    that used launch commands instead of the exe rename strategy.
+    Must be called while Steam is closed.
+    """
+    appid = str(appid)
+    userdata = os.path.join(steam_root, "userdata")
+    if not os.path.exists(userdata):
+        return
+
+    for uid in os.listdir(userdata):
+        vdf_path = os.path.join(userdata, uid, "config", "localconfig.vdf")
+        if not os.path.exists(vdf_path):
+            continue
+
+        with open(vdf_path, "r", errors="replace") as f:
+            content = f.read()
+
+        key_pattern = re.compile(
+            r'"' + re.escape(appid) + r'"\s*\{',
+            re.IGNORECASE
+        )
+        key_match = key_pattern.search(content)
+        if not key_match:
+            continue
+
+        app_open  = key_match.end() - 1
+        app_close = _find_block_end(content, app_open)
+        if app_close == -1:
+            continue
+
+        app_inner = content[app_open + 1:app_close]
+
+        # Only touch LaunchOptions in the flat block, not inside sub-blocks.
+        subblock_match = re.search(r'"[^"]+"\s*\{', app_inner)
+        flat_section = app_inner[:subblock_match.start()] if subblock_match else app_inner
+
+        launch_pattern = re.compile(
+            r'("LaunchOptions"\s*")([^"]*?)(")',
+            re.IGNORECASE
+        )
+        launch_match = launch_pattern.search(flat_section)
+        if not launch_match or not launch_match.group(2).strip():
+            continue
+
+        # Clear the value to empty string
+        new_flat = launch_pattern.sub(r'\g<1>\g<3>', flat_section, count=1)
+        if subblock_match:
+            new_app_inner = new_flat + app_inner[subblock_match.start():]
+        else:
+            new_app_inner = new_flat
+
+        new_content = (
+            content[:app_open + 1] +
+            new_app_inner +
+            content[app_close:]
+        )
+
+        with open(vdf_path, "w", errors="replace") as f:
+            f.write(new_content)
+
+
 def kill_steam():
     """
     Terminate the Steam desktop client without triggering the SteamOS
