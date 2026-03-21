@@ -119,7 +119,9 @@ def _get_deck_serial() -> str | None:
 def _calc_shortcut_appid(exe_path: str, name: str) -> int:
     """
     Calculate the Steam shortcut appid from exe path and name.
-    This matches Steam's algorithm exactly.
+    This must match Steam's internal algorithm exactly. If the CRC or
+    bitmask changes, shortcuts will not resolve and artwork/controller
+    configs will point to the wrong appid. Do not modify.
     """
     key = (exe_path + name).encode("utf-8")
     crc = binascii.crc32(key) & 0xFFFFFFFF
@@ -328,7 +330,14 @@ def _get_template_filename(template_type: str, gyro_mode: str) -> str:
 
 def _assign_controller_config(uid: str, appid: int, shortcut_def: dict,
                                gyro_mode: str, prog):
-    """Assign controller template for a non-Steam shortcut."""
+    """
+    Assign controller template for a non-Steam shortcut.
+
+    We write to both configset_controller_neptune.vdf and the Deck's
+    serial-specific configset. SteamOS in Game Mode reads from the serial
+    file, so without it the profile only works in Desktop Mode.
+    This mirrors what controller_profiles.py does for regular Steam games.
+    """
     template_type = shortcut_def["template_type"]
     template_filename = _get_template_filename(template_type, gyro_mode)
     
@@ -362,7 +371,11 @@ def _assign_controller_config(uid: str, appid: int, shortcut_def: dict,
 
 
 def _patch_configset(configset_path: str, key: str, template_name: str):
-    """Patch configset_controller_neptune.vdf to set our template as default."""
+    """
+    Patch configset_controller_neptune.vdf to set our template as default.
+    Duplicated from controller_profiles.py because shortcut.py runs
+    standalone and should not import from the controller module.
+    """
     entry = f'\t"{key}"\n\t{{\n\t\t"template"\t\t"{template_name}"\n\t}}\n'
 
     if not os.path.exists(configset_path):

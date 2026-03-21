@@ -188,6 +188,10 @@ def launch_bootstrapper(proton_path: str, on_progress=None):
 
 
 # ── copy to game prefix ───────────────────────────────────────────────────────
+# We do a full copy of the Plutonium/ folder into each game's prefix rather
+# than symlinking or sharing a single install. Each prefix is its own Wine
+# environment and symlinks across prefixes can cause path resolution issues.
+# Full copies keep each game isolated so one prefix can't break another.
 
 def _copy_plut_to_prefix(src_plut_dir: str, dest_plut_dir: str,
                           on_progress=None):

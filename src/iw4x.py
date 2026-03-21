@@ -133,6 +133,9 @@ def install_iw4x(game: dict, steam_root: str,
     os.remove(zip_dest)
 
     # ── Rename iw4mp.exe -> iw4mp.exe.bak, copy iw4x.exe -> iw4mp.exe ───────
+    # Same strategy as iw3sp.py. Steam launches iw4mp.exe by name, so
+    # swapping in iw4x.exe lets it run transparently with no launch options
+    # or localconfig.vdf changes. Backup is kept for clean uninstall.
     iw4mp     = os.path.join(install_dir, "iw4mp.exe")
     iw4mp_bak = os.path.join(install_dir, "iw4mp.exe.bak")
     iw4x_exe  = os.path.join(install_dir, "iw4x.exe")

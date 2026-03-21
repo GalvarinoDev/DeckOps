@@ -1,8 +1,8 @@
 "controller_mappings"
 {
 	"version"		"3"
-	"title"		"DeckOps - Gyro on ADS"
-	"description"		"MW1 SP, WaW SP/ZM/MP, MW2 MP, BO1 SP/ZM/MP, MW3 MP, BO2 SP/ZM/MP"
+	"title"		"DeckOps - Gyro Controller - ADS"
+	"description"		"MW1 SP. WaW SP/ZM/MP, MW2 MP, BO1 SP/ZM/MP, MW3 MP, and BO2 SP/ZM/MP ADS"
 	"controller_type"		"controller_neptune"
 	"group"
 	{
@@ -20,7 +20,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button A, Stand/Jump, "
+							"binding"		"xinput_button A, Stand/Jump, , "
 						}
 					}
 				}
@@ -36,7 +36,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button B, Crouch/Prone, "
+							"binding"		"xinput_button B, Crouch/Prone, , "
 						}
 					}
 				}
@@ -52,7 +52,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button X, Use/Reload, "
+							"binding"		"xinput_button X, Use/Reload, , "
 						}
 					}
 				}
@@ -68,7 +68,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button Y, Switch Weapon, "
+							"binding"		"xinput_button Y, Switch Weapon, , "
 						}
 					}
 				}
@@ -94,7 +94,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button dpad_up, Inventory, "
+							"binding"		"xinput_button dpad_up, Inventory, , "
 						}
 						"settings"
 						{
@@ -114,7 +114,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button dpad_down, Inventory, "
+							"binding"		"xinput_button dpad_down, Inventory, , "
 						}
 						"settings"
 						{
@@ -134,7 +134,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button dpad_right, Inventory, "
+							"binding"		"xinput_button dpad_right, Inventory, , "
 						}
 						"settings"
 						{
@@ -154,7 +154,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button dpad_left, Inventory, "
+							"binding"		"xinput_button dpad_left, Inventory, , "
 						}
 						"settings"
 						{
@@ -171,7 +171,7 @@
 	"group"
 	{
 		"id"		"2"
-		"mode"		"joystick_camera"
+		"mode"		"joystick_move"
 		"name"		""
 		"description"		""
 		"inputs"
@@ -184,11 +184,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button JOYSTICK_RIGHT, Melee, "
-						}
-						"settings"
-						{
-							"haptic_intensity"		"1"
+							"binding"		"xinput_button JOYSTICK_RIGHT, Melee, , "
 						}
 					}
 				}
@@ -214,7 +210,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button JOYSTICK_LEFT, Sprint/Hold Breath, "
+							"binding"		"xinput_button JOYSTICK_LEFT, Sprint/Hold Breath, , "
 						}
 						"settings"
 						{
@@ -227,6 +223,10 @@
 				}
 			}
 		}
+		"settings"
+		{
+			"deadzone_inner_radius"		"7199"
+		}
 	}
 	"group"
 	{
@@ -236,26 +236,6 @@
 		"description"		""
 		"inputs"
 		{
-			"click"
-			{
-				"activators"
-				{
-					"Full_Press"
-					{
-						"bindings"
-						{
-							"binding"		"xinput_button TRIGGER_LEFT, Aim Down Sight/Gyro, "
-						}
-						"settings"
-						{
-							"haptic_intensity"		"2"
-						}
-					}
-				}
-				"disabled_activators"
-				{
-				}
-			}
 		}
 		"settings"
 		{
@@ -270,26 +250,6 @@
 		"description"		""
 		"inputs"
 		{
-			"click"
-			{
-				"activators"
-				{
-					"Full_Press"
-					{
-						"bindings"
-						{
-							"binding"		"xinput_button TRIGGER_RIGHT, Fire Weapon, "
-						}
-						"settings"
-						{
-							"haptic_intensity"		"2"
-						}
-					}
-				}
-				"disabled_activators"
-				{
-				}
-			}
 		}
 		"settings"
 		{
@@ -298,43 +258,7 @@
 	}
 	"group"
 	{
-		"id"		"6"
-		"mode"		"absolute_mouse"
-		"name"		""
-		"description"		""
-		"inputs"
-		{
-			"click"
-			{
-				"activators"
-				{
-					"Soft_Press"
-					{
-						"bindings"
-						{
-							"binding"		"mouse_button LEFT, , "
-						}
-						"settings"
-						{
-							"haptic_intensity"		"1"
-						}
-					}
-				}
-				"disabled_activators"
-				{
-				}
-			}
-		}
-		"settings"
-		{
-			"sensitivity"		"523"
-			"acceleration"		"2"
-			"doubetap_max_duration"		"324"
-		}
-	}
-	"group"
-	{
-		"id"		"7"
+		"id"		"8"
 		"mode"		"joystick_move"
 		"name"		""
 		"description"		""
@@ -344,11 +268,11 @@
 			{
 				"activators"
 				{
-					"Soft_Press"
+					"Full_Press"
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button JOYSTICK_RIGHT, Melee, "
+							"binding"		"xinput_button JOYSTICK_RIGHT, Melee, , "
 						}
 					}
 				}
@@ -360,24 +284,7 @@
 	}
 	"group"
 	{
-		"id"		"8"
-		"mode"		"absolute_mouse"
-		"name"		""
-		"description"		""
-		"inputs"
-		{
-		}
-		"settings"
-		{
-			"gyro_natural_sensitivity"		"488"
-			"gyro_button"		"7"
-			"gyro_ratchet_button_mask"		"65536"
-			"gyro_button_invert"		"2"
-		}
-	}
-	"group"
-	{
-		"id"		"10"
+		"id"		"9"
 		"mode"		"dpad"
 		"name"		""
 		"description"		""
@@ -391,7 +298,11 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button DPAD_UP, Inventory, "
+							"binding"		"xinput_button DPAD_UP, Inventory, , "
+						}
+						"settings"
+						{
+							"haptic_intensity"		"1"
 						}
 					}
 				}
@@ -407,7 +318,11 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button DPAD_DOWN, Inventory, "
+							"binding"		"xinput_button DPAD_DOWN, Inventory, , "
+						}
+						"settings"
+						{
+							"haptic_intensity"		"1"
 						}
 					}
 				}
@@ -423,7 +338,11 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button DPAD_RIGHT, Inventory, "
+							"binding"		"xinput_button DPAD_RIGHT, Inventory, , "
+						}
+						"settings"
+						{
+							"haptic_intensity"		"1"
 						}
 					}
 				}
@@ -439,7 +358,11 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button DPAD_LEFT, Inventory, "
+							"binding"		"xinput_button DPAD_LEFT, Inventory, , "
+						}
+						"settings"
+						{
+							"haptic_intensity"		"1"
 						}
 					}
 				}
@@ -456,7 +379,58 @@
 	}
 	"group"
 	{
-		"id"		"11"
+		"id"		"12"
+		"mode"		"absolute_mouse"
+		"name"		""
+		"description"		""
+		"inputs"
+		{
+			"click"
+			{
+				"activators"
+				{
+					"Soft_Press"
+					{
+						"bindings"
+						{
+							"binding"		"mouse_button LEFT, , "
+						}
+					}
+				}
+				"disabled_activators"
+				{
+				}
+			}
+		}
+	}
+	"group"
+	{
+		"id"		"13"
+		"mode"		"joystick_camera"
+		"name"		""
+		"description"		""
+		"inputs"
+		{
+		}
+	}
+	"group"
+	{
+		"id"		"14"
+		"mode"		"gyro_to_mouse"
+		"name"		""
+		"description"		""
+		"inputs"
+		{
+		}
+		"settings"
+		{
+			"gyro_button"		"7"
+			"gyro_ratchet_button_mask"		"65536"
+		}
+	}
+	"group"
+	{
+		"id"		"15"
 		"mode"		"joystick_move"
 		"name"		""
 		"description"		""
@@ -470,7 +444,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button JOYSTICK_RIGHT, Melee, "
+							"binding"		"xinput_button JOYSTICK_RIGHT, Melee, , "
 						}
 						"settings"
 						{
@@ -490,7 +464,24 @@
 	}
 	"group"
 	{
-		"id"		"9"
+		"id"		"16"
+		"mode"		"gyro_to_joystick"
+		"name"		""
+		"description"		""
+		"inputs"
+		{
+		}
+		"settings"
+		{
+			"gyro_natural_sensitivity"		"1600"
+			"acceleration"		"1"
+			"gyro_ratchet_button_mask"		"33554432"
+			"gyro_speed_to_joystick_min"		"0"
+		}
+	}
+	"group"
+	{
+		"id"		"7"
 		"mode"		"switches"
 		"name"		""
 		"description"		""
@@ -536,7 +527,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button shoulder_left, Special Grenade, "
+							"binding"		"xinput_button shoulder_left, Special Grenade, , "
 						}
 					}
 				}
@@ -552,7 +543,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button shoulder_right, Frag Grenade, "
+							"binding"		"xinput_button shoulder_right, Frag Grenade, , "
 						}
 					}
 				}
@@ -568,7 +559,23 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button X, Use/Reload, "
+							"binding"		"xinput_button X, Use/Reload, , "
+						}
+					}
+				}
+				"disabled_activators"
+				{
+				}
+			}
+			"button_back_right"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"xinput_button Y, Switch Weapon, , "
 						}
 					}
 				}
@@ -584,7 +591,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button A, Stand/Jump, "
+							"binding"		"xinput_button A, Stand/Jump, , "
 						}
 					}
 				}
@@ -600,7 +607,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"xinput_button B, Crouch/Prone, "
+							"binding"		"xinput_button B, Crouch/Prone, , "
 						}
 					}
 				}
@@ -616,18 +623,25 @@
 		"name"		"Default"
 		"group_source_bindings"
 		{
-			"9"		"switch active"
+			"7"		"switch active"
 			"0"		"button_diamond active"
 			"1"		"left_trackpad active"
 			"2"		"right_trackpad inactive"
-			"6"		"right_trackpad active"
-			"7"		"right_trackpad inactive"
+			"8"		"right_trackpad inactive"
+			"12"		"right_trackpad active"
+			"13"		"right_trackpad inactive"
 			"3"		"joystick active"
 			"4"		"left_trigger active"
 			"5"		"right_trigger active"
-			"8"		"gyro active"
-			"10"		"dpad active"
-			"11"		"right_joystick active"
+			"9"		"dpad active"
+			"14"		"gyro inactive"
+			"16"		"gyro active"
+			"15"		"right_joystick active"
 		}
+	}
+	"settings"
+	{
+		"left_trackpad_mode"		"0"
+		"right_trackpad_mode"		"0"
 	}
 }

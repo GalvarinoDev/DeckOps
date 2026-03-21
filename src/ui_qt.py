@@ -65,6 +65,20 @@ def font(size=13, bold=False, weight=None, display=False):
         f.setBold(bold)
     return f
 
+# ── Game card definitions ─────────────────────────────────────────────────────
+#
+# Each entry is one card in the UI. Always 6 cards, but what each card shows
+# depends on the Deck model. OLED users get the full key list. LCD users get
+# a reduced set via the lcd_* overrides:
+#
+#   lcd_keys   — which game keys this card includes on LCD (empty = card hidden)
+#   lcd_client — client badge label on LCD (e.g. "steam" instead of "plutonium")
+#   lcd_appid  — appid used for the header image and Steam store link on LCD
+#
+# If an lcd_* field is missing, the card uses the default (OLED) value.
+# The _active_keys(), _active_client(), _active_appid() helpers below
+# resolve the correct value based on the user's saved deck_model config.
+
 ALL_GAMES = [
     {"base":"Call of Duty 4: Modern Warfare","keys":["cod4mp","cod4sp"],"appid":7940,"dev":"iw","client":"cod4x + iw3sp",
      "launch_note":"Launch Multiplayer and Singleplayer at least once through Steam before continuing."},
@@ -840,7 +854,11 @@ class InstallScreen(QWidget):
                 except Exception as ex:
                     self._s.log.emit(f"✗  {base_name} ({key}) failed: {ex}")
 
-        # ── Vanilla Steam games (no mod client — just configs + controllers) ──
+        # ── Vanilla Steam games (no mod client, just configs + controllers) ──
+        # Games like MW2 SP, MW3 SP, and BO2 SP run through Steam as-is.
+        # No download or exe replacement needed. We just mark them as set up
+        # so they show as installed on the My Games screen and get their
+        # display configs and controller profiles applied below.
         for key, gd, game in self.selected:
             c = KEY_CLIENT.get(key, "")
             if c == "steam" and not cfg.is_game_setup(key):

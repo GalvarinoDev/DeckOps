@@ -40,12 +40,17 @@ FONTS = {}
 
 _STEAM_CDN = "https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg"
 
+# Some games have separate appids for SP and MP but share the same store
+# artwork. The MP appids below point to their SP counterpart's header image
+# so we don't download duplicates or get the wrong art on the UI cards.
 _HEADER_OVERRIDES = {
-    10190:  "https://shared.steamstatic.com/store_item_assets/steam/apps/10180/header.jpg",
-    202990: "https://shared.steamstatic.com/store_item_assets/steam/apps/202970/header.jpg",
-    42690:  "https://shared.steamstatic.com/store_item_assets/steam/apps/42680/header.jpg",
+    10190:  "https://shared.steamstatic.com/store_item_assets/steam/apps/10180/header.jpg",   # MW2 MP -> MW2 SP art
+    202990: "https://shared.steamstatic.com/store_item_assets/steam/apps/202970/header.jpg",  # BO2 MP -> BO2 SP art
+    42690:  "https://shared.steamstatic.com/store_item_assets/steam/apps/42680/header.jpg",   # MW3 MP -> MW3 SP art
 }
 
+# Every appid that needs a header image cached locally.
+# SP and MP appids are both listed so the UI can look up either one.
 HEADER_APPIDS = [
     7940,
     10180,

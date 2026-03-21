@@ -63,6 +63,15 @@ APPID_PROFILE_MAP = {
 }
 
 # ── Named game keys used in configset_controller_neptune.vdf ──────────────────
+#
+# Steam resolves controller profiles by both numeric appid AND a named key
+# string in the configset files. We write both so the profile sticks.
+#
+# 10180 and 42680 are empty because they're SP titles that share a named key
+# with their MP counterpart (10190 and 42690). If both wrote to the same
+# named key, the MP entry would overwrite the SP entry every time since
+# the loop processes them in order. Using appid-only for SP avoids that.
+# See also: deckops_uninstall.sh mirrors this map for cleanup.
 
 APPID_NAMED_KEYS = {
     "7940":   ["call of duty 4 modern warfare (2007)"],
@@ -142,6 +151,10 @@ def _patch_configset(configset_path: str, key: str, template_name: str):
     with open(configset_path, "r", encoding="utf-8", errors="replace") as f:
         content = f.read()
 
+    # This regex works because configset entries are shallow (one level of braces).
+    # [^}}]* matches everything inside the block without crossing into nested blocks.
+    # Do NOT reuse this pattern for deeper VDF structures like config.vdf or
+    # localconfig.vdf where blocks nest multiple levels deep.
     pattern = rf'\t"{re.escape(key)}"\n\t\{{[^}}]*\}}\n?'
     if re.search(pattern, content, re.MULTILINE | re.DOTALL):
         content = re.sub(pattern, entry, content, flags=re.MULTILINE | re.DOTALL)
