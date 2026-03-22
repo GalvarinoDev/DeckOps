@@ -34,7 +34,7 @@ DeckOps automates the installation of CoD4x, IW3SP-MOD, iw4x, T6SP-Mod, and Plut
 | Black Ops II | ZM | [Plutonium](https://plutonium.pw) | Both | OLED | ✅ | ✅ |
 | Black Ops II | MP | [Plutonium](https://plutonium.pw) | OLED | OLED | ✅ | ✅ |
 
-> Plutonium online servers require an OLED Steam Deck. LCD users can play WaW, Black Ops, and Black Ops II Zombies offline only. Do not attempt to go online with these on an LCD Deck.
+> Plutonium online servers require an OLED Steam Deck. LCD users can play WaW, Black Ops, and Black Ops II Zombies offline only. DeckOps handles this automatically by launching in LAN mode on LCD.
 
 > All titles support controller and gyro via Steam Input. During setup, choose your gyro style: **Hold** (R5 held), **ADS** (gyro activates when you aim down sights), or **Toggle** (R5 press). Aim assist is unavailable for MW1 MP, MW2 SP, MW3 SP, and BO2 SP.
 
@@ -45,7 +45,7 @@ DeckOps automates the installation of CoD4x, IW3SP-MOD, iw4x, T6SP-Mod, and Plut
 ## ⚠️ Before You Install
 Before running DeckOps, launch each game through Steam in every mode that has a custom client shown in the table above. This creates the folders needed and starts shader cache downloads. Skipping this is the most common cause of install failures.
 
-Plutonium games require a [free account](https://forum.plutonium.pw/register) to play online.
+Plutonium online play requires a [free account](https://forum.plutonium.pw/register) and an OLED Steam Deck. LCD users do not need a Plutonium account. DeckOps automatically launches Plutonium games in offline LAN mode on LCD.
 
 ---
 
@@ -135,6 +135,8 @@ DeckOps is an installer. This project wouldn't exist without the years of founda
 
 ---
 **[PlutoniumAltLauncher](https://github.com/framilano/PlutoniumAltLauncher)** - Inspiration for DeckOps.
+
+**[LanLauncher](https://github.com/JugAndDoubleTap/LanLauncher)** - Inspiration for LCD offline LAN mode.
 
 Steam artwork from [SteamGridDB](https://www.steamgriddb.com) - thanks to [Moohoo](https://www.steamgriddb.com/profile/76561198009314736), [jarvis](https://www.steamgriddb.com/profile/76561198103947979), [Ramjez](https://www.steamgriddb.com/profile/76561198122547176), [Over](https://www.steamgriddb.com/profile/76561198049670875), [Uravity-PRO](https://www.steamgriddb.com/profile/76561198167607660), and [Maxine](https://www.steamgriddb.com/profile/76561198130550992).
 
