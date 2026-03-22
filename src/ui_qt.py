@@ -141,6 +141,16 @@ KEY_EXES = {
     "t6zm":"t6zm.exe","t6mp":"t6mp.exe","t6sp":"t6sp.exe",
 }
 
+# Label shown beneath each per-key checkbox in SetupScreen.
+KEY_MODE_LABEL = {
+    "cod4mp": "MP",    "cod4sp": "SP",
+    "iw4mp":  "MP",    "iw4sp":  "SP",
+    "iw5mp":  "MP",    "iw5sp":  "SP",
+    "t4sp":   "SP+ZM", "t4mp":   "MP",
+    "t5sp":   "SP+ZM", "t5mp":   "MP",
+    "t6sp":   "SP",    "t6zm":   "ZM",    "t6mp":   "MP",
+}
+
 def _is_prefix_ready(steam_root: str, appid: int) -> bool:
     """
     Check if a game has been launched through Steam at least once.
@@ -525,74 +535,124 @@ class SetupScreen(QWidget):
             item = self._ll.takeAt(0)
             if item.widget(): item.widget().deleteLater()
         self._checks.clear()
+
+        from detect_games import GAMES
+        _LCD_OFFLINE_KEYS = {"t4sp", "t5sp", "t6zm"}
+        # Each card gets up to 3 checkbox slots. Empty slots are transparent
+        # placeholders that take space but draw nothing, keeping all rows aligned.
+        MAX_SLOTS  = 3
+        SLOT_W     = 28
+        SLOT_GAP   = 8
+        CHECKS_W   = MAX_SLOTS * SLOT_W + (MAX_SLOTS - 1) * SLOT_GAP
+
         for gd in ALL_GAMES:
             keys = _active_keys(gd)
             if not keys: continue
             ik = [k for k in keys if k in self.installed]
             if not ik: continue
-            base = gd["base"]; done = any(cfg.is_game_setup(k) for k in ik)
-            color = C_IW if gd["dev"]=="iw" else C_TREY
+
+            color  = C_IW if gd["dev"] == "iw" else C_TREY
             client = _active_client(gd)
-            
-            # Check that ALL required prefixes exist (some games span multiple appids)
-            prefix_ready = _all_prefixes_ready(self.steam_root, gd)
-            
-            row = QHBoxLayout(); row.setSpacing(16); row.setContentsMargins(8,8,8,8)
-            cb = QCheckBox()
-            
-            if not prefix_ready:
-                # Prefix missing — disable checkbox, show warning
-                cb.setChecked(False)
-                cb.setEnabled(False)
-                name = _lbl(base, 15, "#555566", align=Qt.AlignLeft, wrap=False)
-            elif done:
-                cb.setChecked(False)
-                name = _lbl(base, 15, "#666677", align=Qt.AlignLeft, wrap=False)
-            else:
-                cb.setChecked(True)
-                name = _lbl(base, 15, "#FFF", align=Qt.AlignLeft, wrap=False)
-            
-            self._checks[base] = (cb, gd)
-            badge = QPushButton(client.upper()); badge.setFont(font(10,True))
-            badge.setFixedSize(160,30); badge.setEnabled(False)
-            badge.setStyleSheet(f"QPushButton{{background:{color};color:#FFF;border:none;border-radius:6px;}}QPushButton:disabled{{background:{color};color:#FFF;}}")
-            row.addWidget(cb); row.addWidget(name, stretch=1); row.addWidget(badge)
-            
-            # Show offline-only note for Plutonium games LCD users can only play offline.
-            # Only shown when the active keys for this card include an LCD-offline key,
-            # so OLED users never see it.
-            _LCD_OFFLINE_KEYS = {"t4sp", "t5sp", "t6zm"}
             is_lcd_offline = not cfg.is_oled() and any(k in _LCD_OFFLINE_KEYS for k in keys)
 
-            if not prefix_ready:
-                # Show launch warning
-                warn = _lbl("⚠ Launch in Steam first", 11, C_TREY, align=Qt.AlignRight, wrap=False)
-                warn.setFixedWidth(160); row.addWidget(warn)
-            elif done:
-                tick = _lbl("✓ set up", 12, C_IW, align=Qt.AlignRight, wrap=False)
-                tick.setFixedWidth(80); row.addWidget(tick)
-            elif is_lcd_offline:
-                offline = _lbl("⚠ offline only", 11, C_TREY, align=Qt.AlignRight, wrap=False)
-                offline.setFixedWidth(100); row.addWidget(offline)
-            
-            cw = QWidget(); cw.setLayout(row)
-            self._ll.insertWidget(self._ll.count()-1, cw)
+            row = QHBoxLayout()
+            row.setSpacing(12)
+            row.setContentsMargins(8, 8, 8, 8)
+
+            # ── Per-key checkbox column ────────────────────────────────────────
+            checks_widget = QWidget()
+            checks_widget.setFixedWidth(CHECKS_W)
+            checks_layout = QHBoxLayout(checks_widget)
+            checks_layout.setContentsMargins(0, 0, 0, 0)
+            checks_layout.setSpacing(SLOT_GAP)
+
+            for key in keys:
+                appid       = GAMES[key]["appid"] if key in GAMES else None
+                installed   = key in self.installed
+                pre_ready   = _is_prefix_ready(self.steam_root, appid) if appid else False
+                already_done = cfg.is_game_setup(key)
+
+                slot = QWidget()
+                slot.setFixedWidth(SLOT_W)
+                slot_lay = QVBoxLayout(slot)
+                slot_lay.setContentsMargins(0, 0, 0, 0)
+                slot_lay.setSpacing(2)
+                slot_lay.setAlignment(Qt.AlignHCenter)
+
+                cb = QCheckBox()
+                if not installed or not pre_ready:
+                    cb.setChecked(False)
+                    cb.setEnabled(False)
+                elif already_done:
+                    cb.setChecked(False)
+                else:
+                    cb.setChecked(True)
+
+                mode_color = C_TREY if (not installed or not pre_ready) else "#666677"
+                mode_lbl = _lbl(KEY_MODE_LABEL.get(key, key), 9, mode_color,
+                                 align=Qt.AlignHCenter, wrap=False)
+
+                slot_lay.addWidget(cb, alignment=Qt.AlignHCenter)
+                slot_lay.addWidget(mode_lbl)
+                checks_layout.addWidget(slot)
+
+                self._checks[key] = (cb, gd)
+
+            # Fill remaining slots with transparent spacers for alignment
+            for _ in range(MAX_SLOTS - len(keys)):
+                spacer = QWidget()
+                spacer.setFixedSize(SLOT_W, 38)
+                spacer.setStyleSheet("background: transparent;")
+                checks_layout.addWidget(spacer)
+
+            row.addWidget(checks_widget)
+
+            # ── Game name + optional offline note ──────────────────────────────
+            name_wrap = QWidget()
+            name_wrap_lay = QVBoxLayout(name_wrap)
+            name_wrap_lay.setContentsMargins(0, 0, 0, 0)
+            name_wrap_lay.setSpacing(2)
+
+            any_ready = any(
+                _is_prefix_ready(self.steam_root, GAMES[k]["appid"])
+                for k in ik if k in GAMES
+            )
+            name_color = "#FFF" if any_ready else "#555566"
+            name_lbl = _lbl(gd["base"], 14, name_color, align=Qt.AlignLeft, wrap=False)
+            name_wrap_lay.addWidget(name_lbl)
+
+            if is_lcd_offline:
+                offline_lbl = _lbl("⚠ offline only on LCD", 10, C_TREY,
+                                    align=Qt.AlignLeft, wrap=False)
+                name_wrap_lay.addWidget(offline_lbl)
+
+            row.addWidget(name_wrap, stretch=1)
+
+            # ── Client badge ───────────────────────────────────────────────────
+            badge = QPushButton(client.upper())
+            badge.setFont(font(10, True))
+            badge.setFixedSize(160, 30)
+            badge.setEnabled(False)
+            badge.setStyleSheet(
+                f"QPushButton{{background:{color};color:#FFF;border:none;border-radius:6px;}}"
+                f"QPushButton:disabled{{background:{color};color:#FFF;}}"
+            )
+            row.addWidget(badge)
+
+            cw = QWidget()
+            cw.setLayout(row)
+            self._ll.insertWidget(self._ll.count() - 1, cw)
 
     def _go_install(self):
         selected = []
         from detect_games import GAMES
-        for base,(cb,gd) in self._checks.items():
+        for key, (cb, gd) in self._checks.items():
             if not cb.isChecked(): continue
-            for key in _active_keys(gd):
-                if key not in self.installed:
-                    continue
-                # Skip individual keys whose prefix isn't ready yet.
-                # The card unlocked because at least one prefix exists (any()),
-                # but we only install modes the user has actually launched.
-                appid = GAMES[key]["appid"] if key in GAMES else None
-                if appid and not _is_prefix_ready(self.steam_root, appid):
-                    continue
-                selected.append((key, gd, self.installed[key]))
+            if key not in self.installed: continue
+            # Only install keys whose prefix is actually ready.
+            appid = GAMES[key]["appid"] if key in GAMES else None
+            if appid and not _is_prefix_ready(self.steam_root, appid): continue
+            selected.append((key, gd, self.installed[key]))
         if not selected:
             self.warning.setText("Select at least one game to continue.")
             self.warning.setVisible(True); return
