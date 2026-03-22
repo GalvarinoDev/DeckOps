@@ -12,6 +12,8 @@
 
 DeckOps automates the installation of CoD4x, IW3SP-MOD, iw4x, T6SP-Mod, and Plutonium on Steam Deck. Pick your games, hit install, and launch them straight from Steam like any other game.
 
+> Want to test experimental features? Check out [DeckOps Nightly](https://github.com/GalvarinoDev/DeckOps-Nightly). It is unstable and not recommended for everyday use.
+
 ---
 
 ## 🎮 Supported Games
