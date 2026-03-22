@@ -162,7 +162,7 @@ def _all_prefixes_ready(steam_root: str, gd: dict) -> bool:
     from detect_games import GAMES
     keys = _active_keys(gd)
     appids_needed = {GAMES[k]["appid"] for k in keys if k in GAMES}
-    return all(_is_prefix_ready(steam_root, aid) for aid in appids_needed)
+    return any(_is_prefix_ready(steam_root, aid) for aid in appids_needed)
 
 SP_IMAGE_URLS = {
     7940:   "https://shared.steamstatic.com/store_item_assets/steam/apps/7940/header.jpg",
@@ -580,11 +580,19 @@ class SetupScreen(QWidget):
 
     def _go_install(self):
         selected = []
+        from detect_games import GAMES
         for base,(cb,gd) in self._checks.items():
             if not cb.isChecked(): continue
             for key in _active_keys(gd):
-                if key in self.installed:
-                    selected.append((key, gd, self.installed[key]))
+                if key not in self.installed:
+                    continue
+                # Skip individual keys whose prefix isn't ready yet.
+                # The card unlocked because at least one prefix exists (any()),
+                # but we only install modes the user has actually launched.
+                appid = GAMES[key]["appid"] if key in GAMES else None
+                if appid and not _is_prefix_ready(self.steam_root, appid):
+                    continue
+                selected.append((key, gd, self.installed[key]))
         if not selected:
             self.warning.setText("Select at least one game to continue.")
             self.warning.setVisible(True); return
