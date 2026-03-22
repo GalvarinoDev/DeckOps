@@ -85,16 +85,16 @@ ALL_GAMES = [
     {"base":"Call of Duty: Modern Warfare 2","keys":["iw4mp","iw4sp"],"appid":10190,"dev":"iw","client":"iw4x",
      "launch_note":"Launch Multiplayer through Steam at least once before continuing."},
     {"base":"Call of Duty: Modern Warfare 3","keys":["iw5mp","iw5sp"],"appid":42690,"dev":"iw","client":"plutonium",
-     "lcd_keys":["iw5sp"],"lcd_client":"steam","lcd_appid":42680,
+     "lcd_keys":["iw5mp","iw5sp"],"lcd_client":"plutonium + steam","lcd_appid":42680,
      "launch_note":"Launch Multiplayer through Steam at least once before continuing."},
     {"base":"Call of Duty: World at War","keys":["t4sp","t4mp"],"appid":10090,"dev":"trey","client":"plutonium",
-     "lcd_keys":["t4sp"],"lcd_client":"plutonium",
+     "lcd_keys":["t4sp","t4mp"],"lcd_client":"plutonium",
      "launch_note":"Launch Campaign through Steam at least once before continuing."},
     {"base":"Call of Duty: Black Ops","keys":["t5sp","t5mp"],"appid":42700,"dev":"trey","client":"plutonium",
-     "lcd_keys":["t5sp"],"lcd_client":"plutonium",
+     "lcd_keys":["t5sp","t5mp"],"lcd_client":"plutonium",
      "launch_note":"Launch Campaign through Steam at least once before continuing."},
     {"base":"Call of Duty: Black Ops II","keys":["t6mp","t6zm","t6sp"],"appid":202990,"dev":"trey","client":"plutonium",
-     "lcd_keys":["t6sp","t6zm"],"lcd_client":"plutonium + steam","lcd_appid":202970,
+     "lcd_keys":["t6sp","t6zm","t6mp"],"lcd_client":"plutonium + steam","lcd_appid":202970,
      "launch_note":"Launch Multiplayer and Zombies through Steam before continuing."},
 ]
 
@@ -1343,11 +1343,11 @@ class ControllerInfoScreen(QWidget):
         # Only shown to LCD users. WaW, BO1, and BO2 ZM run through
         # Plutonium in offline LAN mode on LCD. No account needed.
         self._lcd_plut_warn_div  = _hdiv()
-        self._lcd_plut_warn_hdr  = _lbl("⚠  WaW, Black Ops & BO2 Zombies on LCD", 13, C_TREY, bold=True, align=Qt.AlignLeft)
+        self._lcd_plut_warn_hdr  = _lbl("⚠  Plutonium Games on LCD", 13, C_TREY, bold=True, align=Qt.AlignLeft)
         self._lcd_plut_warn_body = _lbl(
-            "These games run through Plutonium in offline LAN mode on your LCD Deck. "
+            "All Plutonium games run in offline LAN mode on your LCD Deck. "
             "No Plutonium account is needed. Online play is not available on LCD. "
-            "Campaign and Zombies work fully offline.",
+            "Campaign, Zombies, and Multiplayer (with bots) all work offline.",
             11, C_DIM, align=Qt.AlignLeft)
         lay.addWidget(self._lcd_plut_warn_div)
         lay.addWidget(self._lcd_plut_warn_hdr)

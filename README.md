@@ -18,23 +18,23 @@ DeckOps automates the installation of CoD4x, IW3SP-MOD, iw4x, T6SP-Mod, and Plut
 
 ## 🎮 Supported Games
 
-| Game | Mode | Client | Deck | Online | Aim Assist | Gyro |
-|---|---|---|---|---|---|---|
-| Modern Warfare | SP | [IW3SP-MOD](https://gitea.com/JerryALT/iw3sp_mod) | Both | No | ✅ | ✅ |
-| Modern Warfare | MP | [CoD4x](https://cod4x.ovh) | Both | Yes | ❌ | ✅ |
-| Modern Warfare 2 | SP | — | Both | No | ❌ | ✅ |
-| Modern Warfare 2 | MP | [iw4x](https://iw4x.io) | Both | Yes | ✅ | ✅ |
-| Modern Warfare 3 | SP | — | Both | No | ❌ | ✅ |
-| Modern Warfare 3 | MP | [Plutonium](https://plutonium.pw) | OLED | OLED | ✅ | ✅ |
-| World at War | SP + ZM | [Plutonium](https://plutonium.pw) | Both | OLED | ✅ | ✅ |
-| World at War | MP | [Plutonium](https://plutonium.pw) | OLED | OLED | ✅ | ✅ |
-| Black Ops | SP + ZM | [Plutonium](https://plutonium.pw) | Both | OLED | ✅ | ✅ |
-| Black Ops | MP | [Plutonium](https://plutonium.pw) | OLED | OLED | ✅ | ✅ |
-| Black Ops II | SP | [T6SP-Mod](https://github.com/Rattpak/T6SP-Mod-Release) ¹ | Both | No | ❌ | ✅ |
-| Black Ops II | ZM | [Plutonium](https://plutonium.pw) | Both | OLED | ✅ | ✅ |
-| Black Ops II | MP | [Plutonium](https://plutonium.pw) | OLED | OLED | ✅ | ✅ |
+| Game | Mode | Client | Online | Aim Assist | Gyro |
+|---|---|---|---|---|---|
+| Modern Warfare | SP | [IW3SP-MOD](https://gitea.com/JerryALT/iw3sp_mod) | No | ✅ | ✅ |
+| Modern Warfare | MP | [CoD4x](https://cod4x.ovh) | LCD + OLED | ❌ | ✅ |
+| Modern Warfare 2 | SP | — | No | ❌ | ✅ |
+| Modern Warfare 2 | MP | [iw4x](https://iw4x.io) | LCD + OLED | ✅ | ✅ |
+| Modern Warfare 3 | SP | — | No | ❌ | ✅ |
+| Modern Warfare 3 | MP | [Plutonium](https://plutonium.pw) | OLED | ✅ | ✅ |
+| World at War | SP + ZM | [Plutonium](https://plutonium.pw) | OLED | ✅ | ✅ |
+| World at War | MP | [Plutonium](https://plutonium.pw) | OLED | ✅ | ✅ |
+| Black Ops | SP + ZM | [Plutonium](https://plutonium.pw) | OLED | ✅ | ✅ |
+| Black Ops | MP | [Plutonium](https://plutonium.pw) | OLED | ✅ | ✅ |
+| Black Ops II | SP | [T6SP-Mod](https://github.com/Rattpak/T6SP-Mod-Release) ¹ | No | ❌ | ✅ |
+| Black Ops II | ZM | [Plutonium](https://plutonium.pw) | OLED | ✅ | ✅ |
+| Black Ops II | MP | [Plutonium](https://plutonium.pw) | OLED | ✅ | ✅ |
 
-> Plutonium online servers require an OLED Steam Deck. LCD users can play WaW, Black Ops, and Black Ops II Zombies offline only. DeckOps handles this automatically by launching in LAN mode on LCD.
+> Plutonium online servers require an OLED Steam Deck. LCD users can play all Plutonium titles offline in LAN mode, including Multiplayer with bots. DeckOps handles this automatically.
 
 > All titles support controller and gyro via Steam Input. During setup, choose your gyro style: **Hold** (R5 held), **ADS** (gyro activates when you aim down sights), or **Toggle** (R5 press). Aim assist is unavailable for MW1 MP, MW2 SP, MW3 SP, and BO2 SP.
 
@@ -45,7 +45,7 @@ DeckOps automates the installation of CoD4x, IW3SP-MOD, iw4x, T6SP-Mod, and Plut
 ## ⚠️ Before You Install
 Before running DeckOps, launch each game through Steam in every mode that has a custom client shown in the table above. This creates the folders needed and starts shader cache downloads. Skipping this is the most common cause of install failures.
 
-Plutonium online play requires a [free account](https://forum.plutonium.pw/register) and an OLED Steam Deck. LCD users do not need a Plutonium account. DeckOps automatically launches Plutonium games in offline LAN mode on LCD.
+Plutonium online play requires a [free account](https://forum.plutonium.pw/register) and an OLED Steam Deck. LCD users do not need a Plutonium account. DeckOps automatically launches all Plutonium games in offline LAN mode on LCD.
 
 ---
 
@@ -118,6 +118,10 @@ The My Games screen shows every supported game and its current status. From here
 | Reset DeckOps Config | Wipe DeckOps config and run setup again |
 
 ---
+
+## 🔧 Troubleshooting
+
+https://discord.gg/bkSQeq5Azk
 
 ## Credits
 
