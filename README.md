@@ -24,9 +24,9 @@ DeckOps automates the installation of CoD4x, IW3SP-MOD, iw4x, T6SP-Mod, and Plut
 | Modern Warfare 2 | MP | [iw4x](https://iw4x.io) | LCD + OLED | ✅ | ✅ |
 | Modern Warfare 3 | SP | — | LCD + OLED | ❌ | ✅ |
 | Modern Warfare 3 | MP | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
-| World at War | SP + ZM | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
+| World at War | SP + ZM | [Plutonium](https://plutonium.pw) | LCD + OLED | ✅ | ✅ |
 | World at War | MP | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
-| Black Ops | SP + ZM | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
+| Black Ops | SP + ZM | [Plutonium](https://plutonium.pw) | LCD + OLED | ✅ | ✅ |
 | Black Ops | MP | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
 | Black Ops II | SP | [T6SP-Mod](https://github.com/Rattpak/T6SP-Mod-Release) ¹ | LCD + OLED | ✅ | ✅ |
 | Black Ops II | ZM | [Plutonium](https://plutonium.pw) | OLED only | ✅ | ✅ |
