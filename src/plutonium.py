@@ -50,6 +50,11 @@ GAME_META = {
 
 METADATA_FILE = "deckops_plutonium.json"
 
+# Games that run in offline LAN mode on LCD Decks. These use the
+# bootstrapper directly with -lan instead of the normal launcher.
+# LCD Decks cannot connect to Plutonium online servers.
+LCD_OFFLINE_KEYS = {"t4sp", "t5sp", "t6zm"}
+
 # Games that require XACT for audio to work correctly under Proton.
 # Matches the xact=True flags in detect_games.py.
 XACT_GAME_KEYS = {"t4sp", "t4mp", "t5sp", "t5mp"}
@@ -130,6 +135,19 @@ def is_plutonium_ready() -> bool:
         os.path.isdir(os.path.join(storage, d))
         for d in os.listdir(storage)
     )
+
+
+def is_bootstrapper_ready() -> bool:
+    """
+    Returns True if the Plutonium bootstrapper binary exists in the
+    dedicated prefix. This is a weaker check than is_plutonium_ready
+    because it does not require a login. Used for LCD users who run
+    Plutonium in offline LAN mode and never need to authenticate.
+    """
+    bootstrapper = os.path.join(
+        get_dedicated_plut_dir(), "bin", "plutonium-bootstrapper-win32.exe"
+    )
+    return os.path.exists(bootstrapper)
 
 
 # ── bootstrapper ──────────────────────────────────────────────────────────────
@@ -503,10 +521,19 @@ def _write_config(plut_dir: str, game_keys: list, installed_games: dict):
 # ── wrapper script ────────────────────────────────────────────────────────────
 
 def _write_wrapper(game: dict, game_key: str, steam_root: str,
-                   proton_path: str, compatdata_path: str, plut_dir: str):
+                   proton_path: str, compatdata_path: str, plut_dir: str,
+                   lan_mode: bool = False):
     """
-    Replace the game exe with a bash wrapper that launches
-    plutonium-launcher-win32.exe through Proton using the correct protocol.
+    Replace the game exe with a bash wrapper that launches Plutonium
+    through Proton.
+
+    When lan_mode is False (OLED / online):
+        Calls plutonium-launcher-win32.exe with a protocol URL.
+        Requires the user to have logged in.
+
+    When lan_mode is True (LCD / offline):
+        Calls plutonium-bootstrapper-win32.exe directly with -lan.
+        No login required. Game starts in offline LAN mode.
 
     The original exe is backed up as <exe>.bak.
     The wrapper is padded to the original file's size so Steam's
@@ -516,8 +543,6 @@ def _write_wrapper(game: dict, game_key: str, steam_root: str,
     _, _, exe_name = GAME_META[game_key]
     exe_path       = os.path.join(install_dir, exe_name)
     backup_path    = exe_path + ".bak"
-    launcher       = os.path.join(plut_dir, "bin", "plutonium-launcher-win32.exe")
-    plut_url       = f"plutonium://play/{game_key}"
 
     # Read original size before we overwrite
     original_size = os.path.getsize(exe_path) if os.path.exists(exe_path) else 0
@@ -527,12 +552,27 @@ def _write_wrapper(game: dict, game_key: str, steam_root: str,
         shutil.copy2(exe_path, backup_path)
         original_size = os.path.getsize(backup_path)
 
-    script = (
-        "#!/bin/bash\n"
-        f"export STEAM_COMPAT_DATA_PATH=\"{compatdata_path}\"\n"
-        f"export STEAM_COMPAT_CLIENT_INSTALL_PATH=\"{steam_root}\"\n"
-        f"exec \"{proton_path}\" run \"{launcher}\" \"{plut_url}\"\n"
-    )
+    if lan_mode:
+        # LCD offline mode: call the bootstrapper directly with -lan
+        bootstrapper = os.path.join(plut_dir, "bin", "plutonium-bootstrapper-win32.exe")
+        game_dir_wine = _wine_path(install_dir)
+        script = (
+            "#!/bin/bash\n"
+            f"export STEAM_COMPAT_DATA_PATH=\"{compatdata_path}\"\n"
+            f"export STEAM_COMPAT_CLIENT_INSTALL_PATH=\"{steam_root}\"\n"
+            f"exec \"{proton_path}\" run \"{bootstrapper}\" "
+            f"{game_key} \"{game_dir_wine}\" +name \"Player\" -lan\n"
+        )
+    else:
+        # OLED online mode: call the launcher with a protocol URL
+        launcher = os.path.join(plut_dir, "bin", "plutonium-launcher-win32.exe")
+        plut_url = f"plutonium://play/{game_key}"
+        script = (
+            "#!/bin/bash\n"
+            f"export STEAM_COMPAT_DATA_PATH=\"{compatdata_path}\"\n"
+            f"export STEAM_COMPAT_CLIENT_INSTALL_PATH=\"{steam_root}\"\n"
+            f"exec \"{proton_path}\" run \"{launcher}\" \"{plut_url}\"\n"
+        )
 
     script_bytes = script.encode("utf-8")
     if original_size > len(script_bytes):
@@ -625,8 +665,10 @@ def install_plutonium(game: dict, game_key: str, steam_root: str,
     _write_config(dest_plut_dir, keys_for_appid, installed_games)
 
     prog(80, "Writing launcher wrapper...")
+    import config as _cfg
+    lan_mode = (not _cfg.is_oled()) and (game_key in LCD_OFFLINE_KEYS)
     _write_wrapper(game, game_key, steam_root, proton_path,
-                   compatdata_path, dest_plut_dir)
+                   compatdata_path, dest_plut_dir, lan_mode=lan_mode)
 
     prog(95, "Saving metadata...")
     _write_metadata(game["install_dir"], {
