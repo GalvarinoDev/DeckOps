@@ -60,7 +60,7 @@ def _pfx_local(steam_root, appid, *parts):
 # The config map is built inside apply_game_configs so steam_root is available.
 # Keys that are absent for a given model are simply not included.
 
-_LCD_KEYS  = {"cod4sp", "cod4mp", "iw4sp", "iw4mp", "iw5sp"}
+_LCD_KEYS  = {"cod4sp", "cod4mp", "iw4sp", "iw4mp", "iw5sp", "t4sp", "t5sp"}
 _OLED_KEYS = {"cod4sp", "cod4mp", "iw4sp", "iw4mp", "t4sp", "t4mp", "t5sp", "t5mp", "iw5sp", "iw5mp", "t6zm", "t6mp"}
 
 
