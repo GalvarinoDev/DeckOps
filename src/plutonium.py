@@ -553,13 +553,16 @@ def _write_wrapper(game: dict, game_key: str, steam_root: str,
         original_size = os.path.getsize(backup_path)
 
     if lan_mode:
-        # LCD offline mode: call the bootstrapper directly with -lan
+        # LCD offline mode: call the bootstrapper directly with -lan.
+        # cd into the Plutonium directory first so the bootstrapper can
+        # find its files relative to cwd, same as LanLauncher does.
         bootstrapper = os.path.join(plut_dir, "bin", "plutonium-bootstrapper-win32.exe")
         game_dir_wine = _wine_path(install_dir)
         script = (
             "#!/bin/bash\n"
             f"export STEAM_COMPAT_DATA_PATH=\"{compatdata_path}\"\n"
             f"export STEAM_COMPAT_CLIENT_INSTALL_PATH=\"{steam_root}\"\n"
+            f"cd \"{plut_dir}\"\n"
             f"exec \"{proton_path}\" run \"{bootstrapper}\" "
             f"{game_key} \"{game_dir_wine}\" +name \"Player\" -lan\n"
         )
