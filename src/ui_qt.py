@@ -94,7 +94,7 @@ ALL_GAMES = [
      "lcd_keys":["t5sp"],"lcd_client":"plutonium",
      "launch_note":"Launch Campaign through Steam at least once before continuing."},
     {"base":"Call of Duty: Black Ops II","keys":["t6mp","t6zm","t6sp"],"appid":202990,"dev":"trey","client":"plutonium",
-     "lcd_keys":["t6sp"],"lcd_client":"steam","lcd_appid":202970,
+     "lcd_keys":["t6sp","t6zm"],"lcd_client":"plutonium + steam","lcd_appid":202970,
      "launch_note":"Launch Multiplayer and Zombies through Steam before continuing."},
 ]
 
@@ -558,6 +558,12 @@ class SetupScreen(QWidget):
             badge.setStyleSheet(f"QPushButton{{background:{color};color:#FFF;border:none;border-radius:6px;}}QPushButton:disabled{{background:{color};color:#FFF;}}")
             row.addWidget(cb); row.addWidget(name, stretch=1); row.addWidget(badge)
             
+            # Show offline-only note for Plutonium games LCD users can only play offline.
+            # Only shown when the active keys for this card include an LCD-offline key,
+            # so OLED users never see it.
+            _LCD_OFFLINE_KEYS = {"t4sp", "t5sp", "t6zm"}
+            is_lcd_offline = not cfg.is_oled() and any(k in _LCD_OFFLINE_KEYS for k in keys)
+
             if not prefix_ready:
                 # Show launch warning
                 warn = _lbl("⚠ Launch in Steam first", 11, C_TREY, align=Qt.AlignRight, wrap=False)
@@ -565,6 +571,9 @@ class SetupScreen(QWidget):
             elif done:
                 tick = _lbl("✓ set up", 12, C_IW, align=Qt.AlignRight, wrap=False)
                 tick.setFixedWidth(80); row.addWidget(tick)
+            elif is_lcd_offline:
+                offline = _lbl("⚠ offline only", 11, C_TREY, align=Qt.AlignRight, wrap=False)
+                offline.setFixedWidth(100); row.addWidget(offline)
             
             cw = QWidget(); cw.setLayout(row)
             self._ll.insertWidget(self._ll.count()-1, cw)
