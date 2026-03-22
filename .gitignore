@@ -1,7 +1,16 @@
-__pycache__/
-*.pyc
-__pycache__/
-*.pyc
+# Python
 src/__pycache__/
-__pycache__/
 *.pyc
+*.pyo
+
+# DeckOps runtime files
+deckops.json
+assets/images/headers/
+assets/music/
+
+# Virtual environment
+.venv/
+
+# Temp files
+*.tmp
+*.log
