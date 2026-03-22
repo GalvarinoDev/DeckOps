@@ -1225,6 +1225,23 @@ class ControllerInfoScreen(QWidget):
 
         lay.addWidget(_hdiv())
 
+        # ── LCD-only Plutonium online warning ──────────────────────────────────
+        # Only shown to LCD users. WaW and BO1 Campaign/Zombies run through
+        # Plutonium on LCD but online play requires an OLED Deck. Playing
+        # online on LCD will result in errors.
+        self._lcd_plut_warn_div  = _hdiv()
+        self._lcd_plut_warn_hdr  = _lbl("⚠  WaW & Black Ops — Offline Only on LCD", 13, C_TREY, bold=True, align=Qt.AlignLeft)
+        self._lcd_plut_warn_body = _lbl(
+            "Campaign and Zombies for World at War and Black Ops run through Plutonium on LCD. "
+            "Do not attempt to play these online — Plutonium online servers require an OLED Steam Deck "
+            "and you will run into errors if you try. Stick to offline Campaign and Zombies.",
+            11, C_DIM, align=Qt.AlignLeft)
+        lay.addWidget(self._lcd_plut_warn_div)
+        lay.addWidget(self._lcd_plut_warn_hdr)
+        lay.addWidget(self._lcd_plut_warn_body)
+
+        lay.addWidget(_hdiv())
+
         # ── BO2 encrypted config note ──────────────────────────────────────────
         lay.addWidget(_lbl("⚠  Black Ops II - Manual Setup Required", 13, C_TREY, bold=True, align=Qt.AlignLeft))
         lay.addWidget(_lbl(
@@ -1270,6 +1287,11 @@ class ControllerInfoScreen(QWidget):
         self._gyro_lbl.setText(
             f"Standard gamepad layout with gyro aiming ({gyro_desc}) assigned to all games. "
         )
+        # Only show the online warning if the user is on LCD
+        is_lcd = not cfg.is_oled()
+        self._lcd_plut_warn_div.setVisible(is_lcd)
+        self._lcd_plut_warn_hdr.setVisible(is_lcd)
+        self._lcd_plut_warn_body.setVisible(is_lcd)
 
     def _go_management(self):
         root = find_steam_root()
