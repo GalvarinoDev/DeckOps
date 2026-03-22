@@ -50,10 +50,10 @@ GAME_META = {
 
 METADATA_FILE = "deckops_plutonium.json"
 
-# Games that run in offline LAN mode on LCD Decks. These use the
+# All Plutonium games run in offline LAN mode on LCD Decks. These use the
 # bootstrapper directly with -lan instead of the normal launcher.
 # LCD Decks cannot connect to Plutonium online servers.
-LCD_OFFLINE_KEYS = {"t4sp", "t5sp", "t6zm"}
+LCD_OFFLINE_KEYS = {"t4sp", "t4mp", "t5sp", "t5mp", "t6zm", "t6mp", "iw5mp"}
 
 # Games that require XACT for audio to work correctly under Proton.
 # Matches the xact=True flags in detect_games.py.
