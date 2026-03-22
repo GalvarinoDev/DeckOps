@@ -155,11 +155,16 @@ def _is_prefix_ready(steam_root: str, appid: int) -> bool:
     """
     Check if a game has been launched through Steam at least once.
     Returns True if the Proton prefix exists and is initialized.
+    Searches all library dirs (internal + SD card) so games installed
+    on removable storage are detected correctly.
     """
-    prefix = os.path.join(
-        steam_root, "steamapps", "compatdata", str(appid), "pfx"
-    )
-    return os.path.isdir(prefix)
+    from detect_games import _all_library_dirs
+
+    for steamapps_dir in _all_library_dirs(steam_root):
+        pfx = os.path.join(steamapps_dir, "compatdata", str(appid), "pfx")
+        if os.path.isdir(pfx):
+            return True
+    return False
 
 
 def _all_prefixes_ready(steam_root: str, gd: dict) -> bool:
@@ -172,7 +177,7 @@ def _all_prefixes_ready(steam_root: str, gd: dict) -> bool:
     from detect_games import GAMES
     keys = _active_keys(gd)
     appids_needed = {GAMES[k]["appid"] for k in keys if k in GAMES}
-    return any(_is_prefix_ready(steam_root, aid) for aid in appids_needed)
+    return all(_is_prefix_ready(steam_root, aid) for aid in appids_needed)
 
 SP_IMAGE_URLS = {
     7940:   "https://shared.steamstatic.com/store_item_assets/steam/apps/7940/header.jpg",
@@ -192,8 +197,8 @@ CARD_COLS = 3
 
 MUSIC_URL = "https://archive.org/download/adrenaline-klickaud/Adrenaline_KLICKAUD.mp3"
 
-_music_volume  = 0.4
-_music_enabled = True
+_music_volume  = cfg.get_music_volume()
+_music_enabled = cfg.get_music_enabled()
 
 def _pygame_available():
     try:
@@ -233,6 +238,7 @@ def _start_audio():
 def _set_audio_volume(vol: float):
     global _music_volume
     _music_volume = vol
+    cfg.set_music_volume(vol)
     if not _pygame_available():
         return
     try:
@@ -241,6 +247,11 @@ def _set_audio_volume(vol: float):
             pygame.mixer.music.set_volume(vol)
     except Exception:
         pass
+
+def _set_audio_enabled(enabled: bool):
+    global _music_enabled
+    _music_enabled = enabled
+    cfg.set_music_enabled(enabled)
 
 def _header_path(appid: int) -> str:
     return os.path.join(HEADERS_DIR, f"{appid}.jpg")
@@ -384,11 +395,11 @@ class IntroScreen(QWidget):
         gl = QVBoxLayout(self._gyro_section); gl.setContentsMargins(80,60,80,60); gl.setSpacing(16)
 
         # Back button top-left showing which model was picked
-        self._back_btn = _btn("← Steam Deck OLED", C_DARK_BTN, size=11, h=36)
-        self._back_btn.setFixedWidth(220)
+        self._back_btn = _btn("← Back", C_DARK_BTN, size=10, h=30)
+        self._back_btn.setFixedWidth(80)
         self._back_btn.clicked.connect(self._back_to_model)
         back_row = QHBoxLayout()
-        back_row.addWidget(self._back_btn); back_row.addStretch()
+        back_row.addStretch(); back_row.addWidget(self._back_btn); back_row.addStretch()
         gl.addLayout(back_row)
 
         gl.addStretch()
@@ -420,8 +431,6 @@ class IntroScreen(QWidget):
 
     def _pick_model(self, model):
         cfg.set_deck_model(model)
-        label = "Steam Deck OLED" if model == "oled" else "Steam Deck LCD"
-        self._back_btn.setText(f"← {label}")
         self._model_section.setVisible(False)
         self._gyro_section.setVisible(True)
 
@@ -1417,8 +1426,13 @@ class ConfigureScreen(QWidget):
 
         lay.addWidget(_lbl("Background Music", 14, "#CCC", align=Qt.AlignLeft))
         mr = QHBoxLayout(); mr.setSpacing(12)
-        self._music_on = True
-        self._music_toggle = _btn("Music: ON", C_IW, size=12, h=40); self._music_toggle.setFixedWidth(160)
+        self._music_on = _music_enabled
+        self._music_toggle = _btn(
+            "Music: ON" if self._music_on else "Music: OFF",
+            C_IW if self._music_on else C_DARK_BTN,
+            size=12, h=40,
+        )
+        self._music_toggle.setFixedWidth(160)
         self._music_toggle.clicked.connect(self._toggle_music)
         from PyQt5.QtWidgets import QSlider
         self._vol_slider = QSlider(Qt.Horizontal); self._vol_slider.setRange(0,100)
@@ -1479,6 +1493,7 @@ class ConfigureScreen(QWidget):
 
     def _toggle_music(self):
         self._music_on = not self._music_on
+        _set_audio_enabled(self._music_on)
         if self._music_on:
             _start_audio()
             self._music_toggle.setText("Music: ON")
@@ -1495,10 +1510,31 @@ class ConfigureScreen(QWidget):
         _set_audio_volume(val / 100.0)
 
     def _pdirs(self):
-        sr = cfg.load().get("steam_root","")
-        return [d for g in ALL_GAMES if g["plutonium"]
-                for d in [os.path.join(sr,"steamapps","compatdata",str(g["appid"]),"pfx","drive_c","users","steamuser","AppData","Local","Plutonium")]
-                if os.path.isdir(d)]
+        sr = cfg.load().get("steam_root", "")
+        if not sr:
+            return []
+        # Pull the actual per-game appids from plutonium.py so we hit every
+        # prefix, not just the card-level appid. BO1 MP (42710), BO2 ZM
+        # (212910) etc. would be missed otherwise.
+        try:
+            from plutonium import GAME_META
+            appids = sorted({str(v[0]) for v in GAME_META.values()})
+        except ImportError:
+            # Fallback: grab appids from cards that mention plutonium
+            appids = [str(g["appid"]) for g in ALL_GAMES
+                      if "plutonium" in g.get("client", "")]
+        dirs = []
+        seen = set()
+        for aid in appids:
+            d = os.path.join(
+                sr, "steamapps", "compatdata", aid,
+                "pfx", "drive_c", "users", "steamuser",
+                "AppData", "Local", "Plutonium",
+            )
+            if os.path.isdir(d) and d not in seen:
+                seen.add(d)
+                dirs.append(d)
+        return dirs
 
     def _reset(self):
         dirs = self._pdirs()
