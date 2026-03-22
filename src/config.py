@@ -24,6 +24,8 @@ DEFAULTS = {
     "ge_proton_version": None,   # e.g. "GE-Proton10-32"
     "steam_root": None,
     "setup_games": {},           # key: game key, value: { "client": "cod4x"|"iw4x"|"plutonium", "setup_at": timestamp }
+    "music_enabled": True,       # background music on/off
+    "music_volume":  0.4,        # 0.0 to 1.0
 }
 
 
@@ -83,6 +85,30 @@ def set_gyro_mode(mode: str):
     """Save the user's gyro preference. mode should be 'hold' or 'toggle'."""
     config = load()
     config["gyro_mode"] = mode
+    save(config)
+
+
+def get_music_enabled() -> bool:
+    """Returns True if background music is enabled."""
+    return load().get("music_enabled", True)
+
+
+def set_music_enabled(enabled: bool):
+    """Save background music on/off preference."""
+    config = load()
+    config["music_enabled"] = enabled
+    save(config)
+
+
+def get_music_volume() -> float:
+    """Returns music volume as a float between 0.0 and 1.0."""
+    return load().get("music_volume", 0.4)
+
+
+def set_music_volume(volume: float):
+    """Save music volume. Clamped to 0.0 - 1.0."""
+    config = load()
+    config["music_volume"] = max(0.0, min(1.0, volume))
     save(config)
 
 
