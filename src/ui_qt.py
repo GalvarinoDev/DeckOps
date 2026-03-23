@@ -885,12 +885,16 @@ class InstallScreen(QWidget):
 
                 self._s.log.emit("✓  Plutonium ready.")
             else:
-                self._s.progress.emit(12, "Close Plutonium if open, then confirm...")
-                self._s.log.emit(
-                    "Almost there!\n"
-                    "  Close Plutonium if it's still open.\n"
-                    "  Click the button below to continue."
-                )
+                if is_lcd:
+                    self._s.progress.emit(12, "Waiting for Plutonium...")
+                    self._s.log.emit(
+                        "Wait for Plutonium to finish updating, then close Plutonium."
+                    )
+                else:
+                    self._s.progress.emit(12, "Waiting for Plutonium...")
+                    self._s.log.emit(
+                        "Wait for Plutonium to finish updating, sign in, then close Plutonium."
+                    )
                 self._s.plut_wait.emit()
                 self._plut_event.wait()
                 self._s.plut_go.emit()
