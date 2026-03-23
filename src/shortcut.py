@@ -451,23 +451,34 @@ def create_shortcuts(installed_games: dict, selected_keys: list,
             compatdata_path = os.path.join(COMPAT_ROOT, game_appid)
 
             # For t4mp (WaW Multiplayer), plutonium.py has replaced CoDWaWmp.exe
-            # with a bash wrapper — Proton cannot run it as a Windows binary.
-            # Point the shortcut directly at plutonium-launcher-win32.exe instead,
-            # passing the protocol URL as a launch argument after %command%.
+            # with a bash wrapper. Proton cannot run it as a Windows binary.
+            # OLED: point at the launcher with a protocol URL for online play.
+            # LCD: point at the bootstrapper with -lan for offline LAN mode.
             # exe_path (CoDWaWmp.exe) is still used for appid calculation so any
             # existing shortcut entry in Steam is not invalidated.
             if key == "t4mp":
-                plut_launcher = os.path.join(
+                import config as _cfg
+                plut_dir = os.path.join(
                     compatdata_path,
                     "pfx", "drive_c", "users", "steamuser",
-                    "AppData", "Local", "Plutonium", "bin",
-                    "plutonium-launcher-win32.exe",
+                    "AppData", "Local", "Plutonium",
                 )
-                actual_exe     = plut_launcher
-                launch_options = (
-                    f'STEAM_COMPAT_DATA_PATH="{compatdata_path}" '
-                    f'%command% "plutonium://play/t4mp"'
-                )
+                if _cfg.is_oled():
+                    plut_launcher = os.path.join(plut_dir, "bin", "plutonium-launcher-win32.exe")
+                    actual_exe     = plut_launcher
+                    launch_options = (
+                        f'STEAM_COMPAT_DATA_PATH="{compatdata_path}" '
+                        f'%command% "plutonium://play/t4mp"'
+                    )
+                else:
+                    plut_bootstrapper = os.path.join(plut_dir, "bin", "plutonium-bootstrapper-win32.exe")
+                    actual_exe     = plut_bootstrapper
+                    launch_options = (
+                        f'STEAM_COMPAT_DATA_PATH="{compatdata_path}" '
+                        f'%command% t4mp '
+                        f'"Z:{install_dir.replace("/", chr(92))}" '
+                        f'+name "Player" -lan'
+                    )
             else:
                 actual_exe     = exe_path
                 launch_options = f'STEAM_COMPAT_DATA_PATH="{compatdata_path}" %command%'
