@@ -83,6 +83,59 @@ SHORTCUTS = {
 }
 
 
+# ── Steam game artwork ────────────────────────────────────────────────────────
+#
+# Custom artwork applied to Steam-owned MP and ZM titles that share a store
+# page with their SP counterpart. Without this, all modes show the same
+# generic header in the library.
+#
+# SP titles (7940, 10180, 42680, 42700, 202970) are left alone - Steam's
+# default artwork is fine for those.
+
+STEAM_ARTWORK = {
+    "10190": {  # MW2 MP
+        "icon_url":  "https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/10190/7dd7c2d5bce2413131762d7cbee3f059614ed69d.jpg",
+        "grid_url":  "https://cdn2.steamgriddb.com/thumb/4f4ecc161b18f07dcf2c8296fad55709.jpg",
+        "wide_url":  "https://shared.steamstatic.com/store_item_assets/steam/apps/10190/header.jpg",
+        "hero_url":  "https://cdn2.steamgriddb.com/hero_thumb/1fc214004c9481e4c8073e85323bfd4b.png",
+        "logo_url":  "https://cdn2.steamgriddb.com/logo_thumb/d79aac075930c83c2f1e369a511148fe.png",
+        "icon_ext": "jpg", "grid_ext": "jpg", "wide_ext": "jpg", "hero_ext": "png", "logo_ext": "png",
+    },
+    "42690": {  # MW3 MP
+        "icon_url":  "https://cdn2.steamgriddb.com/icon_thumb/67b48cc32ab9f04633bd50656a4a26fc.png",
+        "grid_url":  "https://cdn2.steamgriddb.com/thumb/54726e7600c9c297610f6ed9d7d19ca7.jpg",
+        "wide_url":  "https://cdn2.steamgriddb.com/thumb/ce65f40e3a20ad19fe352c52ce3bcf51.jpg",
+        "hero_url":  "https://cdn2.steamgriddb.com/hero_thumb/51770b1e6f66ba5d45e58a76e6a73dc2.jpg",
+        "logo_url":  "https://cdn2.steamgriddb.com/logo_thumb/4a64d913220fca4c33c140c6952688a8.png",
+        "icon_ext": "png", "grid_ext": "jpg", "wide_ext": "jpg", "hero_ext": "jpg", "logo_ext": "png",
+    },
+    "42710": {  # BO1 MP
+        "icon_url":  "https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/42710/d595fb4b01201cade09e1232f2c41c0866840628.jpg",
+        "grid_url":  "https://cdn2.steamgriddb.com/thumb/978f9d25644371a4c4b8df8c994cd880.png",
+        "wide_url":  "https://cdn2.steamgriddb.com/thumb/a6330e9317a50ccf2d79c295dd18046f.png",
+        "hero_url":  "https://cdn2.steamgriddb.com/hero_thumb/dc82d632c9fcecb0778afbc7924494a6.png",
+        "logo_url":  "https://cdn2.steamgriddb.com/logo_thumb/dfb84a11f431c62436cfb760e30a34fe.png",
+        "icon_ext": "jpg", "grid_ext": "png", "wide_ext": "png", "hero_ext": "png", "logo_ext": "png",
+    },
+    "202990": {  # BO2 MP
+        "icon_url":  "https://cdn2.steamgriddb.com/icon_thumb/715eb56d3f3b71792e230102d1da496d.png",
+        "grid_url":  "https://cdn2.steamgriddb.com/thumb/7d3695ac5fbf55fb65ea261dd3a8577c.jpg",
+        "wide_url":  "https://cdn2.steamgriddb.com/thumb/d841ee63e07b28f94920b81d2e4c21c9.jpg",
+        "hero_url":  "https://cdn2.steamgriddb.com/hero_thumb/731c83db8d2ff01bdc000083fd3c3740.png",
+        "logo_url":  "https://cdn2.steamgriddb.com/logo_thumb/6271faadeedd7626d661856b7a004e27.png",
+        "icon_ext": "png", "grid_ext": "jpg", "wide_ext": "jpg", "hero_ext": "png", "logo_ext": "png",
+    },
+    "212910": {  # BO2 ZM
+        "icon_url":  "https://cdn2.steamgriddb.com/icon_thumb/743c11a9f3cb65cda4994bbdfb66c398.png",
+        "grid_url":  "https://cdn2.steamgriddb.com/thumb/3d9ffc992e48d2aeb4b06f05471f619d.jpg",
+        "wide_url":  "https://cdn2.steamgriddb.com/thumb/b87c4d009662bc436961d8f753a8de78.jpg",
+        "hero_url":  "https://cdn2.steamgriddb.com/hero_thumb/e5e63da79fcd2bebbd7cb8bf1c1d0274.jpg",
+        "logo_url":  "https://cdn2.steamgriddb.com/logo_thumb/79514e888b8f2acacc68738d0cbb803e.png",
+        "icon_ext": "png", "grid_ext": "jpg", "wide_ext": "jpg", "hero_ext": "jpg", "logo_ext": "png",
+    },
+}
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _find_all_steam_uids():
@@ -629,6 +682,59 @@ def remove_shortcuts(on_progress=None):
             prog(f"  ✓ Shortcuts removed for user {uid}")
         except Exception as e:
             prog(f"  ⚠ Could not write shortcuts.vdf for user {uid}: {e}")
+
+
+def apply_steam_artwork(selected_keys: list, on_progress=None):
+    """
+    Download and apply custom artwork for Steam-owned MP/ZM games.
+
+    Uses the Steam appid directly as the grid filename prefix, so files
+    like 10190p.jpg, 10190_hero.png end up in the grid folder and Steam
+    picks them up on next launch.
+
+    selected_keys - list of game keys the user selected (e.g. ["iw4mp", "t6zm"])
+    on_progress   - optional callback(msg: str)
+    """
+    def prog(msg):
+        if on_progress:
+            on_progress(msg)
+
+    # Map game keys to Steam appids that have custom artwork
+    KEY_TO_STEAM_APPID = {
+        "iw4mp":  "10190",
+        "iw5mp":  "42690",
+        "t5mp":   "42710",
+        "t6mp":   "202990",
+        "t6zm":   "212910",
+    }
+
+    to_apply = []
+    for key in selected_keys:
+        steam_appid = KEY_TO_STEAM_APPID.get(key)
+        if not steam_appid:
+            continue
+        art_def = STEAM_ARTWORK.get(steam_appid)
+        if not art_def:
+            continue
+        to_apply.append((key, steam_appid, art_def))
+
+    if not to_apply:
+        return
+
+    uids = _find_all_steam_uids()
+    if not uids:
+        prog("⚠ No Steam user accounts found — artwork skipped.")
+        return
+
+    for uid in uids:
+        grid_dir = os.path.join(USERDATA_DIR, uid, "config", "grid")
+        os.makedirs(grid_dir, exist_ok=True)
+
+        for key, steam_appid, art_def in to_apply:
+            prog(f"  Downloading artwork for {key} (appid {steam_appid})...")
+            _download_artwork(grid_dir, int(steam_appid), art_def, prog)
+
+    prog(f"✓ Steam artwork applied for {len(to_apply)} game(s).")
 
 
 # ── CLI for testing ───────────────────────────────────────────────────────────
