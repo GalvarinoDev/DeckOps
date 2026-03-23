@@ -547,7 +547,7 @@ class SetupScreen(QWidget):
         self._checks.clear()
 
         from detect_games import GAMES
-        _LCD_OFFLINE_KEYS = {"t4sp", "t5sp", "t6zm"}
+        _LCD_OFFLINE_KEYS = {"t4sp", "t4mp", "t5sp", "t5mp", "t6zm", "t6mp", "iw5mp"}
         # Each card gets up to 3 checkbox slots. Empty slots are transparent
         # placeholders that take space but draw nothing, keeping all rows aligned.
         MAX_SLOTS  = 3
