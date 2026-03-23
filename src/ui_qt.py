@@ -1061,6 +1061,17 @@ class InstallScreen(QWidget):
         except Exception as ex:
             self._s.log.emit(f"  Shortcuts skipped: {ex}")
 
+        # ── Custom artwork for Steam MP/ZM games ─────────────────────────────
+        try:
+            from shortcut import apply_steam_artwork
+            self._s.log.emit("Applying custom artwork for multiplayer games...")
+            apply_steam_artwork(
+                selected_keys=selected_keys,
+                on_progress=lambda msg: self._s.log.emit(msg)
+            )
+        except Exception as ex:
+            self._s.log.emit(f"  Steam artwork skipped: {ex}")
+
         cfg.complete_first_run(self.steam_root)
         self._s.progress.emit(100, "All done!")
         self._s.done.emit(True)
