@@ -1,664 +1,311 @@
 """
-shortcut.py — DeckOps non-Steam shortcut creator
+game_config.py - DeckOps game config writer
 
-Creates non-Steam game shortcuts in Steam for CoD4 Multiplayer (CoD4x) and
-World at War Multiplayer. These shortcuts point to the original game exes
-in the Steam library and use the original compatdata prefixes.
+Copies pre-built config files from assets/configs/LCD or assets/configs/OLED
+into the correct destination paths for each game. Overwrites whatever is
+currently there.
 
-Shortcuts include:
-  - Proper artwork (icon, grid, wide, hero, logo) from SteamGridDB
-  - Correct compatdata prefix via launch options
-  - Controller template assignment based on gyro mode
-  - GE-Proton compat tool assignment
-  - Steam Input enabled (AllowDesktopConfig)
-
-Called at the end of InstallScreen._run() after client installation completes.
-Must be called while Steam is closed.
+LCD users receive MW1, MW2, and MW3 SP configs.
+OLED users receive MW1, MW2, WaW, BO1, MW3, and BO2 configs.
 """
 
-import binascii
 import os
-import re
+import glob
 import shutil
-import struct
-import time
-import urllib.request
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
-STEAM_ROOT     = os.path.expanduser("~/.local/share/Steam")
-USERDATA_DIR   = os.path.join(STEAM_ROOT, "userdata")
-COMPAT_ROOT    = os.path.join(STEAM_ROOT, "steamapps", "compatdata")
-STEAM_CONFIG   = os.path.join(STEAM_ROOT, "config", "config.vdf")
-
-_HERE          = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT   = os.path.dirname(_HERE)
-ASSETS_DIR     = os.path.join(PROJECT_ROOT, "assets", "controllers")
-
-MIN_UID = 10000
-
-_BROWSER_UA = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                  "AppleWebKit/537.36 (KHTML, like Gecko) "
-                  "Chrome/124.0.0.0 Safari/537.36",
-    "Accept": "*/*",
-}
+_HERE        = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(_HERE)
+CONFIGS_DIR  = os.path.join(PROJECT_ROOT, "assets", "configs")
 
 
-# ── Shortcut definitions ──────────────────────────────────────────────────────
+# ── Config map ────────────────────────────────────────────────────────────────
+#
+# Each entry maps a game key to a list of (asset_subpath, dest_resolver) pairs.
+#
+# asset_subpath  — path relative to assets/configs/<MODEL>/
+# dest_resolver  — callable(install_dir, steam_root) -> absolute destination directory
+#
+# Files are copied with their original filename preserved.
 
-SHORTCUTS = {
-    "cod4mp": {
-        "name":            "Call of Duty 4: Modern Warfare - Multiplayer",
-        "exe_name":        "iw3mp.exe",
-        "game_appid":      "7940",
-        "template_type":   "other",
-        "icon_url":        "https://cdn2.steamgriddb.com/icon/59b109c700b500daa9ef3a6769bc8c6f.png",
-        "grid_url":        "https://cdn2.steamgriddb.com/thumb/7a22b900577a6edbffd53153cea2999c.jpg",
-        "wide_url":        "https://cdn2.steamgriddb.com/thumb/69a24bf40cd265fb00ae685cdaa040c7.jpg",
-        "hero_url":        "https://cdn2.steamgriddb.com/hero_thumb/95bc8e097e09212ec0160a7bc0b46fd6.jpg",
-        "logo_url":        "https://cdn2.steamgriddb.com/logo_thumb/0440169a43de927753429dd69ca8c735.png",
-        "icon_ext":        "png",
-        "grid_ext":        "jpg",
-        "wide_ext":        "jpg",
-        "hero_ext":        "jpg",
-        "logo_ext":        "png",
-    },
-    "t4mp": {
-        "name":            "Call of Duty: World at War - Multiplayer",
-        "exe_name":        "CoDWaWmp.exe",
-        "game_appid":      "10090",
-        "template_type":   "standard",
-        "icon_url":        "https://cdn2.steamgriddb.com/icon/854d6fae5ee42911677c739ee1734486.png",
-        "grid_url":        "https://cdn2.steamgriddb.com/grid/bb933c55afc6987ae406e48ff58786d6.png",
-        "wide_url":        "https://cdn2.steamgriddb.com/thumb/a6a0076c7e1907a4555b17cc2a6ebc85.jpg",
-        "hero_url":        "https://cdn2.steamgriddb.com/hero_thumb/e369853df766fa44e1ed0ff613f563bd.jpg",
-        "logo_url":        "https://cdn2.steamgriddb.com/logo_thumb/0a32bfcf5c87aa42d2a0367c1f6bb17c.png",
-        "icon_ext":        "png",
-        "grid_ext":        "png",
-        "wide_ext":        "jpg",
-        "hero_ext":        "jpg",
-        "logo_ext":        "png",
-    },
-}
-
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-def _find_all_steam_uids():
-    """Return all valid Steam user ID folders from userdata/."""
-    if not os.path.isdir(USERDATA_DIR):
-        return []
-    seen, uids = set(), []
-    for entry in os.listdir(USERDATA_DIR):
-        if not entry.isdigit() or int(entry) < MIN_UID:
-            continue
-        real = os.path.realpath(os.path.join(USERDATA_DIR, entry))
-        if real in seen:
-            continue
-        seen.add(real)
-        uids.append(entry)
-    return uids
-
-
-def _get_deck_serial() -> str | None:
-    """Read the Steam Deck serial number from Steam's config.vdf."""
-    if not os.path.exists(STEAM_CONFIG):
-        return None
-    try:
-        with open(STEAM_CONFIG, "r", encoding="utf-8", errors="replace") as f:
-            content = f.read()
-        match = re.search(r'"SteamDeckRegisteredSerialNumber"\s+"([^"]+)"', content)
-        if match:
-            return match.group(1)
-    except Exception:
-        pass
-    return None
-
-
-def _calc_shortcut_appid(exe_path: str, name: str) -> int:
+def _compatdata(steam_root, appid):
     """
-    Calculate the Steam shortcut appid from exe path and name.
-    This must match Steam's internal algorithm exactly. If the CRC or
-    bitmask changes, shortcuts will not resolve and artwork/controller
-    configs will point to the wrong appid. Do not modify.
+    Return the compatdata path for a given appid.
+
+    Searches all Steam library folders (internal + SD card) so configs are
+    written to the correct prefix regardless of where the game is installed.
+    Falls back to steam_root if the prefix isn't found elsewhere.
     """
-    key = (exe_path + name).encode("utf-8")
-    crc = binascii.crc32(key) & 0xFFFFFFFF
-    return (crc | 0x80000000) & 0xFFFFFFFF
+    from detect_games import _all_library_dirs
+
+    for steamapps_dir in _all_library_dirs(steam_root):
+        candidate = os.path.join(steamapps_dir, "compatdata", str(appid))
+        if os.path.isdir(candidate):
+            return candidate
+
+    # Fallback — prefix may not exist yet (os.makedirs will create it later)
+    return os.path.join(steam_root, "steamapps", "compatdata", str(appid))
 
 
-def _to_signed32(n):
-    """Convert unsigned int32 appid to signed int32 for vdf binary format."""
-    return n if n <= 2147483647 else n - 2**32
-
-
-def _download(url: str, dest: str) -> bool:
-    """Download a file from URL to dest path. Returns True on success."""
-    try:
-        os.makedirs(os.path.dirname(dest), exist_ok=True)
-        req = urllib.request.Request(url, headers=_BROWSER_UA)
-        with urllib.request.urlopen(req, timeout=30) as r:
-            with open(dest, "wb") as f:
-                f.write(r.read())
-        return True
-    except Exception:
-        return False
-
-
-# ── Binary VDF helpers ────────────────────────────────────────────────────────
-
-def _vdf_string(key: str, val: str) -> bytes:
-    """Encode a string field for binary VDF."""
-    return b'\x01' + key.encode('utf-8') + b'\x00' + val.encode('utf-8') + b'\x00'
-
-
-def _vdf_int(key: str, val: int) -> bytes:
-    """Encode an int32 field for binary VDF."""
-    return b'\x02' + key.encode('utf-8') + b'\x00' + struct.pack('<i', val)
-
-
-def _make_shortcut_entry(index: int, entry: dict) -> bytes:
-    """Build a single shortcut entry in binary VDF format."""
-    data = b'\x00' + str(index).encode('utf-8') + b'\x00'
-    
-    data += _vdf_int('appid', entry.get('appid', 0))
-    data += _vdf_string('AppName', entry.get('AppName', ''))
-    data += _vdf_string('Exe', entry.get('Exe', ''))
-    data += _vdf_string('StartDir', entry.get('StartDir', ''))
-    data += _vdf_string('icon', entry.get('icon', ''))
-    data += _vdf_string('ShortcutPath', entry.get('ShortcutPath', ''))
-    data += _vdf_string('LaunchOptions', entry.get('LaunchOptions', ''))
-    data += _vdf_int('IsHidden', entry.get('IsHidden', 0))
-    data += _vdf_int('AllowDesktopConfig', entry.get('AllowDesktopConfig', 1))
-    data += _vdf_int('AllowOverlay', entry.get('AllowOverlay', 1))
-    data += _vdf_int('OpenVR', entry.get('OpenVR', 0))
-    data += _vdf_int('Devkit', entry.get('Devkit', 0))
-    data += _vdf_string('DevkitGameID', entry.get('DevkitGameID', ''))
-    data += _vdf_int('DevkitOverrideAppID', entry.get('DevkitOverrideAppID', 0))
-    data += _vdf_int('LastPlayTime', entry.get('LastPlayTime', 0))
-    data += _vdf_string('FlatpakAppID', entry.get('FlatpakAppID', ''))
-    
-    # Tags submenu
-    data += b'\x00tags\x00'
-    tags = entry.get('tags', {})
-    for k, v in tags.items():
-        data += _vdf_string(str(k), str(v))
-    data += b'\x08'  # End tags
-    
-    data += b'\x08'  # End entry
-    return data
-
-
-def _read_existing_shortcuts(path: str) -> list:
-    """
-    Read existing shortcuts from shortcuts.vdf.
-    Returns list of AppName strings.
-    """
-    if not os.path.exists(path):
-        return []
-    
-    try:
-        with open(path, 'rb') as f:
-            data = f.read()
-    except Exception:
-        return []
-    
-    # Extract AppName values
-    existing = []
-    for match in re.finditer(b'\x01[Aa]pp[Nn]ame\x00([^\x00]+)\x00', data):
-        existing.append(match.group(1).decode('utf-8', errors='replace'))
-    
-    return existing
-
-
-def _read_shortcuts_raw(path: str) -> bytes:
-    """Read the raw shortcuts.vdf content, stripping header/footer."""
-    if not os.path.exists(path):
-        return b''
-    
-    try:
-        with open(path, 'rb') as f:
-            data = f.read()
-    except Exception:
-        return b''
-    
-    # Strip header (b'\x00shortcuts\x00') and footer (b'\x08\x08')
-    header = b'\x00shortcuts\x00'
-    if data.startswith(header):
-        data = data[len(header):]
-    if data.endswith(b'\x08\x08'):
-        data = data[:-2]
-    elif data.endswith(b'\x08'):
-        data = data[:-1]
-    
-    return data
-
-
-def _get_next_index(raw_data: bytes) -> int:
-    """
-    Find the next available shortcut index from raw shortcut entry data.
-
-    Shortcut entries start with the byte sequence: 0x00 <index_str> 0x00
-    immediately followed by 0x02 (the appid int field marker). This two-byte
-    lookahead distinguishes real entry headers from the many other 0x00...0x00
-    numeric sequences present in binary VDF data (string lengths, field values, etc.).
-    """
-    if not raw_data:
-        return 0
-
-    indices = []
-    i = 0
-    while i < len(raw_data) - 2:
-        if raw_data[i] == 0x00:
-            end = raw_data.find(b'\x00', i + 1)
-            if end != -1 and end > i + 1:
-                # Only treat as an entry index if immediately followed by
-                # 0x02 (int32 field type byte for the 'appid' field header)
-                if end + 1 < len(raw_data) and raw_data[end + 1] == 0x02:
-                    try:
-                        idx_str = raw_data[i + 1:end].decode('utf-8')
-                        if idx_str.isdigit():
-                            indices.append(int(idx_str))
-                    except (UnicodeDecodeError, ValueError):
-                        pass
-                i = end + 1
-            else:
-                i += 1
-        else:
-            i += 1
-
-    return max(indices, default=-1) + 1
-
-
-def _write_shortcuts_vdf(path: str, existing_raw: bytes, new_entries: list):
-    """Write shortcuts.vdf with existing entries preserved and new ones appended."""
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    
-    data = b'\x00shortcuts\x00'
-    
-    if existing_raw:
-        data += existing_raw
-    
-    for entry_bytes in new_entries:
-        data += entry_bytes
-    
-    data += b'\x08\x08'
-    
-    with open(path, 'wb') as f:
-        f.write(data)
-
-
-# ── Artwork download ──────────────────────────────────────────────────────────
-
-def _download_artwork(grid_dir: str, appid: int, shortcut_def: dict, prog):
-    """Download all artwork for a shortcut to the grid directory."""
-    appid_str = str(appid)
-    os.makedirs(grid_dir, exist_ok=True)
-    
-    artwork_map = [
-        ("icon_url",  f"{appid_str}_icon.{shortcut_def['icon_ext']}",  "icon"),
-        ("grid_url",  f"{appid_str}p.{shortcut_def['grid_ext']}",      "grid"),
-        ("wide_url",  f"{appid_str}.{shortcut_def['wide_ext']}",       "wide"),
-        ("hero_url",  f"{appid_str}_hero.{shortcut_def['hero_ext']}",  "hero"),
-        ("logo_url",  f"{appid_str}_logo.{shortcut_def['logo_ext']}",  "logo"),
-    ]
-    
-    for url_key, filename, label in artwork_map:
-        url = shortcut_def.get(url_key)
-        if not url:
-            continue
-        dest = os.path.join(grid_dir, filename)
-        if os.path.exists(dest):
-            prog(f"    ✓ {label} (cached)")
-            continue
-        if _download(url, dest):
-            prog(f"    ✓ {label}")
-        else:
-            prog(f"    ⚠ {label} failed")
-
-
-# ── Controller template assignment ────────────────────────────────────────────
-
-def _get_template_filename(template_type: str, gyro_mode: str) -> str:
-    """Return the controller template filename based on type and gyro mode."""
-    if template_type == "other":
-        return f"controller_neptune_deckops_other_{gyro_mode}.vdf"
-    else:
-        return f"controller_neptune_deckops_{gyro_mode}.vdf"
-
-
-def _assign_controller_config(uid: str, appid: int, shortcut_def: dict,
-                               gyro_mode: str, prog):
-    """
-    Assign controller template for a non-Steam shortcut.
-
-    We write to both configset_controller_neptune.vdf and the Deck's
-    serial-specific configset. SteamOS in Game Mode reads from the serial
-    file, so without it the profile only works in Desktop Mode.
-    This mirrors what controller_profiles.py does for regular Steam games.
-    """
-    template_type = shortcut_def["template_type"]
-    template_filename = _get_template_filename(template_type, gyro_mode)
-    
-    src_template = os.path.join(ASSETS_DIR, template_filename)
-    if not os.path.exists(src_template):
-        prog(f"    ⚠ Template not found: {template_filename}")
-        return
-    
-    appid_str = str(appid)
-    
-    # Path: Steam Controller Configs/<uid>/config/<appid>/
-    steam_cfg_root = os.path.join(
-        STEAM_ROOT, "steamapps", "common",
-        "Steam Controller Configs", uid, "config"
+def _pfx_local(steam_root, appid, *parts):
+    """Return a path inside pfx/drive_c/users/steamuser/AppData/Local/ for an appid."""
+    return os.path.join(
+        _compatdata(steam_root, appid),
+        "pfx", "drive_c", "users", "steamuser", "AppData", "Local",
+        *parts
     )
-    cfg_dir = os.path.join(steam_cfg_root, appid_str)
-    os.makedirs(cfg_dir, exist_ok=True)
-    shutil.copy2(src_template, os.path.join(cfg_dir, "controller_neptune.vdf"))
-    
-    # Patch configset_controller_neptune.vdf
-    configset_path = os.path.join(steam_cfg_root, "configset_controller_neptune.vdf")
-    _patch_configset(configset_path, appid_str, template_filename)
-    
-    # Patch configset_{serial}.vdf — SteamOS on Deck reads from this file
-    serial = _get_deck_serial()
-    if serial:
-        configset_serial = os.path.join(steam_cfg_root, f"configset_{serial}.vdf")
-        _patch_configset(configset_serial, appid_str, template_filename)
-    
-    prog(f"    ✓ Controller: {template_filename}")
 
 
-def _patch_configset(configset_path: str, key: str, template_name: str):
+# The config map is built inside apply_game_configs so steam_root is available.
+# Keys that are absent for a given model are simply not included.
+
+_LCD_KEYS  = {"cod4sp", "cod4mp", "iw4sp", "iw4mp", "iw5sp", "iw5mp", "t4sp", "t4mp", "t5sp", "t5mp", "t6zm", "t6mp"}
+_OLED_KEYS = {"cod4sp", "cod4mp", "iw4sp", "iw4mp", "t4sp", "t4mp", "t5sp", "t5mp", "iw5sp", "iw5mp", "t6zm", "t6mp"}
+
+
+def _build_config_map(steam_root):
     """
-    Patch configset_controller_neptune.vdf to set our template as default.
-    Duplicated from controller_profiles.py because shortcut.py runs
-    standalone and should not import from the controller module.
+    Returns a dict mapping game_key -> list of (asset_subpath, dest_dir) pairs.
+    dest_dir will be created if it does not exist.
     """
-    entry = f'\t"{key}"\n\t{{\n\t\t"template"\t\t"{template_name}"\n\t}}\n'
+    return {
+        # ── MW1 SP (IW3SP-MOD) ────────────────────────────────────────────────
+        # Config lands in players/profiles/Player/ inside the game install dir.
+        # Resolved at call time via install_dir — see apply_game_configs().
+        "cod4sp": [
+            ("MW1/iw3sp_mod_config.cfg", None),  # dest resolved from install_dir
+        ],
 
-    if not os.path.exists(configset_path):
-        os.makedirs(os.path.dirname(configset_path), exist_ok=True)
-        with open(configset_path, "w", encoding="utf-8") as f:
-            f.write('"controller_config"\n{\n' + entry + '}\n')
-        return
+        # ── MW1 MP (CoD4x) ────────────────────────────────────────────────────
+        # Lives inside the CoD4 compatdata prefix.
+        "cod4mp": [
+            (
+                "MW1/config_mp.cfg",
+                _pfx_local(
+                    steam_root, 7940,
+                    "CallofDuty4MW", "players", "profiles", "Player"
+                ),
+            ),
+        ],
 
-    with open(configset_path, "r", encoding="utf-8", errors="replace") as f:
-        content = f.read()
+        # ── MW2 SP ────────────────────────────────────────────────────────────
+        # Lives in players/ inside the game install dir.
+        # Resolved at call time via install_dir — see apply_game_configs().
+        "iw4sp": [
+            ("MW2/config.cfg", None),
+        ],
 
-    pattern = rf'\t"{re.escape(key)}"\n\t\{{[^}}]*\}}\n?'
-    if re.search(pattern, content, re.MULTILINE | re.DOTALL):
-        content = re.sub(pattern, entry, content, flags=re.MULTILINE | re.DOTALL)
-    else:
-        content = content.rstrip()
-        if content.endswith("}"):
-            content = content[:-1].rstrip() + "\n" + entry + "}\n"
+        # ── MW2 MP (iw4x) ─────────────────────────────────────────────────────
+        # Lives in players/ inside the game install dir.
+        # Resolved at call time via install_dir — see apply_game_configs().
+        "iw4mp": [
+            ("MW2/iw4x_config.cfg", None),
+        ],
 
-    with open(configset_path, "w", encoding="utf-8") as f:
-        f.write(content)
+        # ── WaW SP + MP (Plutonium t4) ────────────────────────────────────────
+        # Both configs live in the same Plutonium storage path.
+        "t4sp": [
+            (
+                "WaW/config.cfg",
+                _pfx_local(
+                    steam_root, 10090,
+                    "Plutonium", "storage", "t4", "players", "profiles", "$$$"
+                ),
+            ),
+        ],
+        "t4mp": [
+            (
+                "WaW/config_mp.cfg",
+                _pfx_local(
+                    steam_root, 10090,
+                    "Plutonium", "storage", "t4", "players", "profiles", "$$$"
+                ),
+            ),
+        ],
+
+        # ── BO1 SP (Plutonium t5, appid 42700) ────────────────────────────────
+        "t5sp": [
+            (
+                "BO1/config.cfg",
+                _pfx_local(
+                    steam_root, 42700,
+                    "Plutonium", "storage", "t5", "players"
+                ),
+            ),
+        ],
+
+        # ── BO1 MP (Plutonium t5, appid 42710) ────────────────────────────────
+        "t5mp": [
+            (
+                "BO1/config_mp.cfg",
+                _pfx_local(
+                    steam_root, 42710,
+                    "Plutonium", "storage", "t5", "players"
+                ),
+            ),
+        ],
+
+        # ── MW3 SP (via Steam, appid 42690) ───────────────────────────────────
+        # Config lands in players2/ inside the game install dir.
+        # Resolved at call time via install_dir — see apply_game_configs().
+        "iw5sp": [
+            ("MW3/config.cfg", None),
+        ],
+
+        # ── MW3 MP (Plutonium iw5, appid 42690) ───────────────────────────────
+        # Lives inside the Plutonium storage path for iw5.
+        "iw5mp": [
+            (
+                "MW3/config_mp.cfg",
+                _pfx_local(
+                    steam_root, 42690,
+                    "Plutonium", "storage", "iw5", "players"
+                ),
+            ),
+        ],
+
+        # ── BO2 ZM (Plutonium t6, appid 212910) ───────────────────────────────
+        # BO2 uses separate appids for ZM and MP — each has its own compatdata
+        # prefix. ZM lives under appid 212910.
+        "t6zm": [
+            (
+                "BO2/plutonium_zm.cfg",
+                _pfx_local(
+                    steam_root, 212910,
+                    "Plutonium", "storage", "t6", "players"
+                ),
+            ),
+        ],
+
+        # ── BO2 MP (Plutonium t6, appid 202990) ───────────────────────────────
+        # MP lives under its own separate appid 202990.
+        "t6mp": [
+            (
+                "BO2/plutonium_mp.cfg",
+                _pfx_local(
+                    steam_root, 202990,
+                    "Plutonium", "storage", "t6", "players"
+                ),
+            ),
+        ],
+    }
+
+
+# ── Install-dir based dest resolvers ──────────────────────────────────────────
+
+def _dest_from_install(game_key, install_dir):
+    """
+    For game keys whose destination is relative to install_dir,
+    return the correct absolute destination directory.
+    Returns None for keys that use a fixed compatdata path instead.
+    """
+    if game_key == "cod4sp":
+        return os.path.join(install_dir, "players", "profiles", "Player")
+    if game_key in ("iw4sp", "iw4mp"):
+        return os.path.join(install_dir, "players")
+    if game_key == "iw5sp":
+        return os.path.join(install_dir, "players2")
+    return None
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def create_shortcuts(installed_games: dict, selected_keys: list,
-                     gyro_mode: str, on_progress=None):
+def apply_game_configs(selected_keys, installed_games, steam_root,
+                       deck_model, on_progress=None):
     """
-    Create non-Steam shortcuts for CoD4 MP and WaW MP if they were selected
-    and installed. Creates shortcuts for ALL Steam user accounts.
+    Copy pre-built config files into the correct destination for each
+    selected game key, based on the user's deck model.
+
+    selected_keys   — list of game keys the user selected to install
+    installed_games — dict from detect_games.find_installed_games()
+    steam_root      — path to Steam root
+    deck_model      — 'oled' or 'lcd'
+    on_progress     — optional callback(msg: str)
+
+    Returns (applied, skipped, failed) counts.
     """
     def prog(msg):
         if on_progress:
             on_progress(msg)
-    
-    to_create = []
-    for key, shortcut_def in SHORTCUTS.items():
-        if key not in selected_keys:
-            continue
-        if key not in installed_games:
-            continue
-        game = installed_games[key]
-        install_dir = game.get("install_dir") or game.get("path")
-        if not install_dir:
-            continue
-        to_create.append((key, shortcut_def, install_dir))
-    
-    if not to_create:
-        prog("No shortcuts to create.")
-        return
-    
-    uids = _find_all_steam_uids()
-    if not uids:
-        prog("⚠ No Steam user accounts found — shortcuts skipped.")
-        return
-    
-    for uid in uids:
-        prog(f"Creating shortcuts for user {uid}...")
-        
-        shortcuts_path = os.path.join(USERDATA_DIR, uid, "config", "shortcuts.vdf")
-        grid_dir = os.path.join(USERDATA_DIR, uid, "config", "grid")
-        
-        existing_names = _read_existing_shortcuts(shortcuts_path)
-        existing_raw = _read_shortcuts_raw(shortcuts_path)
-        next_idx = _get_next_index(existing_raw)
-        
-        new_entries = []
-        
-        for key, shortcut_def, install_dir in to_create:
-            name = shortcut_def["name"]
-            exe_path = os.path.join(install_dir, shortcut_def["exe_name"])
-            game_appid = shortcut_def["game_appid"]
-            compatdata_path = os.path.join(COMPAT_ROOT, game_appid)
 
-            # For t4mp (WaW Multiplayer), plutonium.py has replaced CoDWaWmp.exe
-            # with a bash wrapper. Proton cannot run it as a Windows binary.
-            # OLED: point at the launcher with a protocol URL for online play.
-            # LCD: point at the bootstrapper with -lan for offline LAN mode.
-            # exe_path (CoDWaWmp.exe) is still used for appid calculation so any
-            # existing shortcut entry in Steam is not invalidated.
-            if key == "t4mp":
-                import config as _cfg
-                plut_dir = os.path.join(
-                    compatdata_path,
-                    "pfx", "drive_c", "users", "steamuser",
-                    "AppData", "Local", "Plutonium",
-                )
-                if _cfg.is_oled():
-                    plut_launcher = os.path.join(plut_dir, "bin", "plutonium-launcher-win32.exe")
-                    actual_exe     = plut_launcher
-                    launch_options = (
-                        f'STEAM_COMPAT_DATA_PATH="{compatdata_path}" '
-                        f'%command% "plutonium://play/t4mp"'
-                    )
-                else:
-                    plut_bootstrapper = os.path.join(plut_dir, "bin", "plutonium-bootstrapper-win32.exe")
-                    actual_exe     = plut_bootstrapper
-                    launch_options = (
-                        f'STEAM_COMPAT_DATA_PATH="{compatdata_path}" '
-                        f'%command% t4mp '
-                        f'"Z:{install_dir.replace("/", chr(92))}" '
-                        f'+name "Player" -lan'
-                    )
+    applied  = 0
+    skipped  = 0
+    failed   = 0
+
+    # ── Sibling key expansion ─────────────────────────────────────────────
+    # MW2 SP (iw4sp) and MW3 SP (iw5sp) have config entries but aren't
+    # tracked by detect_games / ALL_GAMES — they run through vanilla Steam.
+    # When their MP sibling is selected, auto-include the SP key so its
+    # display config also gets written.  The SP shares the same install_dir.
+    _SIBLING_MAP = {
+        "iw4mp": "iw4sp",   # MW2 MP  → MW2 SP
+        "iw5mp": "iw5sp",   # MW3 MP  → MW3 SP
+    }
+    expanded_keys = list(selected_keys)
+    for mp_key, sp_key in _SIBLING_MAP.items():
+        if mp_key in selected_keys and sp_key not in expanded_keys:
+            expanded_keys.append(sp_key)
+            # Re-use the MP game entry so the SP key has a valid install_dir
+            if mp_key in installed_games and sp_key not in installed_games:
+                installed_games[sp_key] = installed_games[mp_key]
+
+    model_dir   = "OLED" if deck_model == "oled" else "LCD"
+    allowed_keys = _OLED_KEYS if deck_model == "oled" else _LCD_KEYS
+    config_map  = _build_config_map(steam_root)
+
+    for key in expanded_keys:
+        if key not in allowed_keys:
+            continue
+        if key not in config_map:
+            prog(f"  - {key}: no config available yet, skipping")
+            skipped += 1
+            continue
+
+        game       = installed_games.get(key, {})
+        install_dir = game.get("install_dir", "")
+
+        for asset_subpath, fixed_dest in config_map[key]:
+            src = os.path.join(CONFIGS_DIR, model_dir, asset_subpath)
+
+            if not os.path.exists(src):
+                prog(f"  - {key}: asset not found ({asset_subpath}), skipping")
+                skipped += 1
+                continue
+
+            # Resolve destination directory
+            if fixed_dest:
+                # For "own" games, fixed_dest was built using the Steam appid-based
+                # compatdata path. Swap the base out for the actual shortcut prefix
+                # stored in the game dict so configs land in the right prefix.
+                if game.get("source") == "own" and game.get("compatdata_path"):
+                    pfx_parts = fixed_dest.split("/pfx/", 1)
+                    if len(pfx_parts) == 2:
+                        fixed_dest = os.path.join(
+                            game["compatdata_path"], "pfx", pfx_parts[1]
+                        )
+                dest_dir = fixed_dest
             else:
-                actual_exe     = exe_path
-                launch_options = f'STEAM_COMPAT_DATA_PATH="{compatdata_path}" %command%'
+                if not install_dir:
+                    prog(f"  - {key}: install_dir unknown, skipping")
+                    skipped += 1
+                    continue
+                dest_dir = _dest_from_install(key, install_dir)
+                if not dest_dir:
+                    prog(f"  - {key}: could not resolve destination, skipping")
+                    skipped += 1
+                    continue
 
-            shortcut_appid = _calc_shortcut_appid(exe_path, name)
+            os.makedirs(dest_dir, exist_ok=True)
+            dest = os.path.join(dest_dir, os.path.basename(src))
 
-            prog(f"  → {name}")
-            prog(f"    appid: {shortcut_appid}")
-
-            if name in existing_names:
-                prog(f"    ✓ Shortcut exists")
-            else:
-                icon_path = os.path.join(grid_dir, f"{shortcut_appid}_icon.{shortcut_def['icon_ext']}")
-
-                entry = {
-                    "appid":               _to_signed32(shortcut_appid),
-                    "AppName":             name,
-                    "Exe":                 f'"{actual_exe}"',
-                    "StartDir":            f'"{install_dir}"',
-                    "icon":                icon_path,
-                    "ShortcutPath":        "",
-                    "LaunchOptions":       launch_options,
-                    "IsHidden":            0,
-                    "AllowDesktopConfig":  1,
-                    "AllowOverlay":        1,
-                    "OpenVR":              0,
-                    "Devkit":              0,
-                    "DevkitGameID":        "",
-                    "DevkitOverrideAppID": 0,
-                    "LastPlayTime":        int(time.time()),
-                    "FlatpakAppID":        "",
-                    "tags":                {"0": "DeckOps"},
-                }
-
-                entry_bytes = _make_shortcut_entry(next_idx, entry)
-                new_entries.append(entry_bytes)
-                next_idx += 1
-                prog(f"    ✓ Shortcut created")
-
-            # Set GE-Proton as the compat tool for this shortcut's appid,
-            # the same way it is set for regular Steam games in ge_proton.py.
-            # We use the shortcut_appid (not game_appid) because config.vdf
-            # CompatToolMapping is keyed on the appid Steam actually launches.
             try:
-                import config as cfg
-                from wrapper import set_compat_tool
-                ge_version = cfg.get_ge_proton_version()
-                if ge_version:
-                    set_compat_tool([str(shortcut_appid)], ge_version)
-                    prog(f"    ✓ GE-Proton {ge_version} set")
-                else:
-                    prog(f"    ⚠ GE-Proton version unknown — compat tool not set")
+                shutil.copy2(src, dest)
+                prog(f"  + {key}: {os.path.basename(src)} -> {dest_dir}")
+                applied += 1
             except Exception as ex:
-                prog(f"    ⚠ Could not set GE-Proton for shortcut: {ex}")
+                prog(f"  - {key}: failed to copy {os.path.basename(src)}: {ex}")
+                failed += 1
 
-            _download_artwork(grid_dir, shortcut_appid, shortcut_def, prog)
-            _assign_controller_config(uid, shortcut_appid, shortcut_def, gyro_mode, prog)
-        
-        if new_entries:
-            try:
-                _write_shortcuts_vdf(shortcuts_path, existing_raw, new_entries)
-                prog(f"  ✓ shortcuts.vdf saved")
-            except Exception as e:
-                prog(f"  ⚠ Failed to write shortcuts.vdf: {e}")
-        else:
-            prog(f"  ✓ No new shortcuts needed")
-    
-    prog("✓ Non-Steam shortcuts created.")
-
-
-def remove_shortcuts(on_progress=None):
-    """Remove DeckOps-created shortcuts from shortcuts.vdf for all users."""
-    def prog(msg):
-        if on_progress:
-            on_progress(msg)
-
-    shortcut_names = {s["name"] for s in SHORTCUTS.values()}
-
-    for uid in _find_all_steam_uids():
-        shortcuts_path = os.path.join(USERDATA_DIR, uid, "config", "shortcuts.vdf")
-        if not os.path.exists(shortcuts_path):
-            continue
-
-        try:
-            with open(shortcuts_path, 'rb') as f:
-                data = f.read()
-        except Exception:
-            continue
-
-        # Check if any DeckOps shortcut names are present at all
-        if not any(name.encode('utf-8') in data for name in shortcut_names):
-            continue
-
-        # Strip header/footer, collect non-DeckOps entries, rewrite
-        existing_raw = _read_shortcuts_raw(shortcuts_path)
-        if not existing_raw:
-            continue
-
-        # Walk entries: each starts with 0x00 <index> 0x00 0x02
-        # Collect byte ranges for entries we want to KEEP
-        kept_entries = []
-        i = 0
-        while i < len(existing_raw):
-            # Find entry start
-            if existing_raw[i] != 0x00:
-                i += 1
-                continue
-            end_idx = existing_raw.find(b'\x00', i + 1)
-            if end_idx == -1 or end_idx + 1 >= len(existing_raw):
-                i += 1
-                continue
-            if existing_raw[end_idx + 1] != 0x02:
-                i += 1
-                continue
-
-            # Found an entry header at i — find where this entry ends (0x08 terminator)
-            entry_start = i
-            entry_end = existing_raw.find(b'\x08', end_idx)
-            if entry_end == -1:
-                break
-            entry_end += 1  # include the terminator byte
-
-            entry_bytes = existing_raw[entry_start:entry_end]
-
-            # Check if this entry belongs to DeckOps
-            is_deckops = any(name.encode('utf-8') in entry_bytes for name in shortcut_names)
-            if not is_deckops:
-                kept_entries.append(entry_bytes)
-            else:
-                prog(f"  Removing shortcut for user {uid}...")
-
-            i = entry_end
-
-        # Re-index kept entries so indices are sequential from 0
-        reindexed = []
-        for new_idx, entry_bytes in enumerate(kept_entries):
-            # Replace the old index in the entry header: 0x00 <old_idx_str> 0x00
-            old_end = entry_bytes.find(b'\x00', 1)
-            if old_end != -1:
-                reindexed.append(
-                    b'\x00' + str(new_idx).encode('utf-8') + entry_bytes[old_end:]
-                )
-            else:
-                reindexed.append(entry_bytes)
-
-        try:
-            _write_shortcuts_vdf(shortcuts_path, b''.join(reindexed), [])
-            prog(f"  ✓ Shortcuts removed for user {uid}")
-        except Exception as e:
-            prog(f"  ⚠ Could not write shortcuts.vdf for user {uid}: {e}")
-
-
-# ── CLI for testing ───────────────────────────────────────────────────────────
-
-if __name__ == "__main__":
-    import sys
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    
-    from detect_games import find_steam_root, parse_library_folders, find_installed_games
-    
-    print("Finding installed games...")
-    steam_root = find_steam_root()
-    if not steam_root:
-        print("Steam not found.")
-        sys.exit(1)
-    
-    libs = parse_library_folders(steam_root)
-    installed = find_installed_games(libs)
-    
-    print(f"Found {len(installed)} games")
-    for key in SHORTCUTS:
-        if key in installed:
-            print(f"  ✓ {key}: {installed[key].get('install_dir', installed[key].get('path'))}")
-        else:
-            print(f"  ✗ {key}: not installed")
-    
-    print("\nCreating shortcuts (test mode)...")
-    create_shortcuts(
-        installed_games=installed,
-        selected_keys=list(SHORTCUTS.keys()),
-        gyro_mode="hold",
-        on_progress=lambda msg: print(msg)
-    )
+    prog(f"Game configs: {applied} applied, {skipped} skipped, {failed} failed.")
+    return applied, skipped, failed
