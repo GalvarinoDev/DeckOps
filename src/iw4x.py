@@ -1,8 +1,10 @@
 """
 iw4x.py - DeckOps installer for IW4x (Modern Warfare 2)
 
-Downloads iw4x.dll, iw4x.exe, release.zip and iwd files directly from
-the latest GitHub release into the MW2 install folder, then:
+Downloads iw4x.dll and release.zip from the latest GitHub releases.
+release.zip contains iw4x.exe, all iwd files, zone patches, and other
+rawfile assets. Everything extracts directly into the game install folder.
+
   - Renames iw4mp.exe -> iw4mp.exe.bak
   - Copies iw4x.exe -> iw4mp.exe
 
@@ -20,17 +22,11 @@ import threading
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-BASE_URL = "https://github.com/iw4x/iw4x-client/releases/latest/download"
-RAW_URL  = "https://github.com/iw4x/iw4x-rawfiles/releases/latest/download"
-
-IWD_FILES = [
-    "iw4x_00.iwd",
-    "iw4x_01.iwd",
-    "iw4x_02.iwd",
-    "iw4x_03.iwd",
-    "iw4x_04.iwd",
-    "iw4x_05.iwd",
-]
+# iw4x.dll comes from the client repo, everything else from rawfiles.
+# release.zip contains iw4x.exe, iw4x/*.iwd files, zone/patch/*,
+# and other assets. No separate downloads needed.
+DLL_URL = "https://github.com/iw4x/iw4x-client/releases/latest/download/iw4x.dll"
+ZIP_URL = "https://github.com/iw4x/iw4x-rawfiles/releases/latest/download/release.zip"
 
 _BROWSER_UA = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -46,7 +42,7 @@ def _download(url: str, dest: str, on_progress=None, label: str = ""):
     for attempt in range(3):
         try:
             req = urllib.request.Request(url, headers=_BROWSER_UA)
-            with urllib.request.urlopen(req, timeout=60) as r:
+            with urllib.request.urlopen(req, timeout=120) as r:
                 total = int(r.headers.get("Content-Length", 0))
                 downloaded = 0
                 with open(dest, "wb") as f:
@@ -78,8 +74,9 @@ def install_iw4x(game: dict, steam_root: str,
     """
     Install or reinstall IW4x for Modern Warfare 2.
 
-    Downloads iw4x.dll, iw4x.exe, release.zip, and iwd files concurrently,
-    then renames iw4mp.exe -> iw4mp.exe.bak and copies iw4x.exe -> iw4mp.exe
+    Downloads iw4x.dll and release.zip concurrently. release.zip contains
+    iw4x.exe, all iwd files, zone patches, and other rawfile assets.
+    Then renames iw4mp.exe -> iw4mp.exe.bak and copies iw4x.exe -> iw4mp.exe
     so Steam launches IW4x transparently. No launch options are written.
 
     game            — entry from detect_games.find_installed_games()
@@ -96,13 +93,12 @@ def install_iw4x(game: dict, steam_root: str,
         if on_progress:
             on_progress(pct, msg)
 
-    # ── Download iw4x.dll, iw4x.exe, release.zip concurrently ────────────────
+    # ── Download iw4x.dll and release.zip concurrently ────────────────────────
     prog(5, "Downloading iw4x files...")
 
     dl_tasks = [
-        (f"{BASE_URL}/iw4x.dll",   os.path.join(install_dir, "iw4x.dll"),  "iw4x.dll"),
-        (f"{RAW_URL}/iw4x.exe",    os.path.join(install_dir, "iw4x.exe"),   "iw4x.exe"),
-        (f"{RAW_URL}/release.zip", os.path.join(install_dir, "release.zip"), "release.zip"),
+        (DLL_URL, os.path.join(install_dir, "iw4x.dll"),    "iw4x.dll"),
+        (ZIP_URL, os.path.join(install_dir, "release.zip"), "release.zip"),
     ]
     dl_errors = []
     dl_done   = [0]
@@ -114,7 +110,7 @@ def install_iw4x(game: dict, steam_root: str,
             dl_done[0] += 1
             prog(5 + int(dl_done[0] / len(dl_tasks) * 45), f"Downloaded {label}")
 
-    with ThreadPoolExecutor(max_workers=3) as ex:
+    with ThreadPoolExecutor(max_workers=2) as ex:
         futs = {ex.submit(_dl, url, dest, label): label for url, dest, label in dl_tasks}
         for fut in as_completed(futs):
             try:
@@ -126,7 +122,15 @@ def install_iw4x(game: dict, steam_root: str,
         raise RuntimeError("Download failed:\n" + "\n".join(dl_errors))
 
     # ── Extract release.zip ───────────────────────────────────────────────────
-    prog(52, "Extracting rawfiles...")
+    # release.zip contains:
+    #   iw4x.exe          (root)
+    #   iw4x/*.iwd        (iwd files)
+    #   iw4x/html/        (server browser assets)
+    #   iw4x/images/      (branding)
+    #   iw4x/video/        (intro video)
+    #   zone/patch/        (fastfile patches)
+    #   zonebuilder.exe    (modding tool)
+    prog(55, "Extracting release.zip...")
     zip_dest = os.path.join(install_dir, "release.zip")
     with zipfile.ZipFile(zip_dest) as zf:
         zf.extractall(install_dir)
@@ -140,37 +144,11 @@ def install_iw4x(game: dict, steam_root: str,
     iw4mp_bak = os.path.join(install_dir, "iw4mp.exe.bak")
     iw4x_exe  = os.path.join(install_dir, "iw4x.exe")
 
-    prog(57, "Replacing iw4mp.exe...")
+    prog(80, "Replacing iw4mp.exe...")
     if os.path.exists(iw4mp) and not os.path.exists(iw4mp_bak):
         os.rename(iw4mp, iw4mp_bak)
     if os.path.exists(iw4x_exe):
         shutil.copy2(iw4x_exe, iw4mp)
-
-    # ── iwd files -> iw4x/ subfolder concurrently ────────────────────────────
-    prog(62, "Downloading iwd files...")
-    errors    = []
-    completed = [0]
-    iwd_lock  = threading.Lock()
-
-    def _download_iwd(iwd):
-        dest = os.path.join(iw4x_dir, iwd)
-        if not os.path.exists(dest):
-            _download(f"{RAW_URL}/{iwd}", dest, None, f"Downloading {iwd}...")
-        with iwd_lock:
-            completed[0] += 1
-            pct = 62 + int(completed[0] / len(IWD_FILES) * 33)
-            prog(pct, f"Downloaded {completed[0]}/{len(IWD_FILES)} iwd files...")
-
-    with ThreadPoolExecutor(max_workers=6) as executor:
-        futures = {executor.submit(_download_iwd, iwd): iwd for iwd in IWD_FILES}
-        for future in as_completed(futures):
-            try:
-                future.result()
-            except Exception as ex:
-                errors.append(f"{futures[future]}: {ex}")
-
-    if errors:
-        raise RuntimeError("iwd download failed:\n" + "\n".join(errors))
 
     prog(100, "IW4x installation complete!")
 
@@ -189,7 +167,7 @@ def uninstall_iw4x(game: dict):
             os.remove(iw4mp)
         os.rename(iw4mp_bak, iw4mp)
 
-    for fname in ["iw4x.dll", "iw4x.exe"]:
+    for fname in ["iw4x.dll", "iw4x.exe", "zonebuilder.exe"]:
         p = os.path.join(install_dir, fname)
         if os.path.exists(p):
             os.remove(p)
@@ -197,6 +175,15 @@ def uninstall_iw4x(game: dict):
     iw4x_dir = os.path.join(install_dir, "iw4x")
     if os.path.exists(iw4x_dir):
         shutil.rmtree(iw4x_dir)
+
+    # Clean up zone/patch directory added by release.zip
+    zone_patch = os.path.join(install_dir, "zone", "patch")
+    if os.path.exists(zone_patch):
+        shutil.rmtree(zone_patch)
+        # Remove zone/ dir too if it's now empty
+        zone_dir = os.path.join(install_dir, "zone")
+        if os.path.isdir(zone_dir) and not os.listdir(zone_dir):
+            os.rmdir(zone_dir)
 
     # Clean up old DeckOps metadata if upgrading from a previous install
     old_meta = os.path.join(install_dir, "iw4x-updoot")
