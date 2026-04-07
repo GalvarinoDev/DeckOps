@@ -137,6 +137,8 @@ DeckOps is an installer. This project wouldn't exist without the years of founda
 
 **[Plutonium](https://plutonium.pw)** - Modern Warfare 3, World at War, Black Ops, and Black Ops II client. 💰 [Donate](https://forum.plutonium.pw/donate)
 
+Official Test Team: LeFinnaBust & Special Agent Dale Cooper
+
 ---
 **[PlutoniumAltLauncher](https://github.com/framilano/PlutoniumAltLauncher)** - Inspiration for DeckOps.
 
