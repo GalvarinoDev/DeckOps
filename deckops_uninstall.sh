@@ -1746,6 +1746,10 @@ for f in \
     "controller_neptune_deckops_legion_off.vdf" \
     "controller_neptune_deckops_legion_other_ads.vdf" \
     "controller_neptune_deckops_legion_other_off.vdf" \
+    "controller_steamos_handheld_deckops_legion_ads.vdf" \
+    "controller_steamos_handheld_deckops_legion_off.vdf" \
+    "controller_steamos_handheld_deckops_legion_other_ads.vdf" \
+    "controller_steamos_handheld_deckops_legion_other_off.vdf" \
     "controller_neptune_deckops_2btn_ads.vdf" \
     "controller_neptune_deckops_2btn_off.vdf" \
     "controller_neptune_deckops_2btn_other_ads.vdf" \
@@ -2013,6 +2017,7 @@ for uid in os.listdir(USERDATA):
         # Clean configset files (neptune + serial-specific + all external types)
         configsets_to_clean = [
             "configset_controller_neptune.vdf",
+            "configset_controller_steamos_handheld.vdf",
             "configset_controller_ps5.vdf",
             "configset_controller_ps4.vdf",
             "configset_controller_ps5_edge.vdf",
