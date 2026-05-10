@@ -664,6 +664,169 @@
 	}
 	"group"
 	{
+		"id"		"17"
+		"mode"		"absolute_mouse"
+		"name"		""
+		"description"		""
+		"inputs"
+		{
+			"click"
+			{
+				"activators"
+				{
+					"Soft_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press INSERT, Overlay On/Off, "
+						}
+					}
+				}
+				"disabled_activators"
+				{
+				}
+			}
+		}
+	}
+	"group"
+	{
+		"id"		"18"
+		"mode"		"four_buttons"
+		"name"		""
+		"description"		""
+		"inputs"
+		{
+			"button_a"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press Y, Team Chat, "
+						}
+						"settings"
+						{
+							"haptic_intensity"		"0"
+						}
+					}
+				}
+				"disabled_activators"
+				{
+				}
+			}
+			"button_b"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press T, All Chat, "
+						}
+						"settings"
+						{
+							"haptic_intensity"		"0"
+						}
+					}
+				}
+				"disabled_activators"
+				{
+				}
+			}
+			"button_x"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press BACK_TICK, Console, "
+						}
+						"settings"
+						{
+							"haptic_intensity"		"0"
+						}
+					}
+				}
+				"disabled_activators"
+				{
+				}
+			}
+			"button_y"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press INSERT, Overlay On/Off, "
+						}
+						"settings"
+						{
+							"haptic_intensity"		"0"
+						}
+					}
+				}
+				"disabled_activators"
+				{
+				}
+			}
+		}
+	}
+	"group"
+	{
+		"id"		"19"
+		"mode"		"joystick_move"
+		"name"		""
+		"description"		""
+		"inputs"
+		{
+		}
+	}
+	"group"
+	{
+		"id"		"20"
+		"mode"		"single_button"
+		"name"		""
+		"description"		""
+		"inputs"
+		{
+			"click"
+			{
+				"activators"
+				{
+					"Soft_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press INSERT, Overlay On/Off, "
+						}
+					}
+				}
+				"disabled_activators"
+				{
+				}
+			}
+		}
+	}
+	"group"
+	{
+		"id"		"21"
+		"mode"		"mouse_joystick"
+		"name"		""
+		"description"		""
+		"inputs"
+		{
+		}
+	}
+
+	"group"
+	{
 		"id"		"6"
 		"mode"		"switches"
 		"name"		""
@@ -770,7 +933,7 @@
 					{
 						"bindings"
 						{
-							"binding"		"key_press 1, Switch Weapon, , "
+							"binding"		"key_press Z, Push to Talk, , "
 						}
 					}
 				}
@@ -839,7 +1002,12 @@
 		{
 			"6"		"switch active"
 			"0"		"button_diamond active"
-			"1"		"left_trackpad active"
+			"1"		"left_trackpad inactive"
+			"17"		"left_trackpad inactive"
+			"18"		"left_trackpad active"
+			"19"		"left_trackpad inactive"
+			"20"		"left_trackpad inactive"
+			"21"		"left_trackpad inactive"
 			"2"		"right_trackpad active"
 			"3"		"joystick active"
 			"4"		"left_trigger active"

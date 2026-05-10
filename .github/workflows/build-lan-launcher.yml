@@ -1,0 +1,35 @@
+name: Build LAN Launcher (Windows exe)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'src/launcher_plut_win.py'
+      - '.github/workflows/build-lan-launcher.yml'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install PyQt5 pygame pyinstaller XInput-Python
+
+      - name: Build executable
+        run: |
+          pyinstaller --onefile --noconsole --hidden-import=XInput --name "DeckOps_Offline" src/launcher_plut_win.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeckOps-Offline-Launcher
+          path: dist/DeckOps_Offline.exe

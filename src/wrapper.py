@@ -1,8 +1,89 @@
 import os
+import json
 import re
 import stat
 import shutil
 import subprocess
+
+from identity import LEDGER_PATH
+from log import get_logger
+
+_log = get_logger(__name__)
+
+# ── VDF edit ledger ──────────────────────────────────────────────────────────
+# Records every VDF edit DeckOps makes so the uninstaller can reverse them
+# precisely instead of regex-sweeping entire files.
+
+
+def _read_ledger() -> dict:
+    """Read the VDF edit ledger, returning empty dict if missing/corrupt."""
+    if not os.path.exists(LEDGER_PATH):
+        return {}
+    try:
+        with open(LEDGER_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        _log.debug("VDF ledger read failed, starting fresh", exc_info=True)
+        return {}
+
+
+def _write_ledger(data: dict):
+    """Write the VDF edit ledger. Failures are logged but non-fatal."""
+    try:
+        os.makedirs(os.path.dirname(LEDGER_PATH), exist_ok=True)
+        with open(LEDGER_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+    except OSError:
+        _log.debug("VDF ledger write failed", exc_info=True)
+
+
+def _record_localconfig(uid: str, appid: str, key: str, value: str):
+    """Record a localconfig.vdf edit in the ledger."""
+    ledger = _read_ledger()
+    lc = ledger.setdefault("localconfig", {})
+    uid_block = lc.setdefault(uid, {})
+    app_block = uid_block.setdefault(appid, {})
+    app_block[key] = value
+    _write_ledger(ledger)
+
+
+def _record_config_vdf(appid: str, key: str, value: str):
+    """Record a config.vdf edit in the ledger."""
+    ledger = _read_ledger()
+    cv = ledger.setdefault("config_vdf", {})
+    section = cv.setdefault(key, {})
+    section[appid] = value
+    _write_ledger(ledger)
+
+
+def _remove_config_vdf(appid: str, key: str):
+    """Remove a config.vdf entry from the ledger (for clear operations)."""
+    ledger = _read_ledger()
+    cv = ledger.get("config_vdf", {})
+    section = cv.get(key, {})
+    section.pop(appid, None)
+    if not section:
+        cv.pop(key, None)
+    _write_ledger(ledger)
+
+
+def _record_configset(configset_filename: str, key: str, template_name: str):
+    """Record a configset VDF edit in the ledger."""
+    ledger = _read_ledger()
+    cs = ledger.setdefault("configsets", {})
+    file_block = cs.setdefault(configset_filename, {})
+    file_block[key] = template_name
+    _write_ledger(ledger)
+
+
+
+def _backup_file(path: str):
+    """Write a .bak copy before modifying a Steam config file."""
+    if os.path.exists(path):
+        try:
+            shutil.copy2(path, path + ".bak")
+        except OSError:
+            _log.debug("VDF backup failed for config file", exc_info=True)
 
 
 def _find_block_end(text, start):
@@ -30,6 +111,77 @@ def _find_block_end(text, start):
                     return i
         i += 1
     return -1
+
+
+def _validate_vdf(path: str) -> bool:
+    """
+    Read a VDF file back after writing and verify brace balance.
+
+    Walks the entire file using the same quote-aware brace parser that
+    _find_block_end uses. A valid VDF file has every { matched by a }.
+    Returns True if balanced, False if corrupt.
+
+    On failure, automatically restores from .bak if available and logs
+    the error. This catches corruption before Steam ever sees the file.
+    """
+    try:
+        with open(path, "r", errors="replace") as f:
+            data = f.read()
+    except OSError:
+        _log.error("VDF validation: cannot read %s", path)
+        return False
+
+    depth = 0
+    in_quote = False
+    for i, c in enumerate(data):
+        if c == '"' and (i == 0 or data[i - 1] != '\\'):
+            in_quote = not in_quote
+        elif not in_quote:
+            if c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+                if depth < 0:
+                    break
+
+    if depth != 0:
+        _log.error(
+            "VDF validation FAILED for %s (brace depth %d) — restoring backup",
+            path, depth,
+        )
+        bak = path + ".bak"
+        if os.path.exists(bak):
+            try:
+                shutil.copy2(bak, path)
+                _log.info("VDF restored from %s", bak)
+            except OSError:
+                _log.error("VDF restore failed for %s", path, exc_info=True)
+        return False
+
+    return True
+
+
+def _write_and_validate_vdf(path: str, data: str, encoding: str = "utf-8",
+                            errors: str | None = None) -> bool:
+    """
+    Write VDF data to path, then validate brace balance.
+
+    Backs up before writing. If validation fails, the backup is
+    automatically restored. Returns True if the write is clean.
+
+    encoding / errors — passed to open(). Use errors="replace" for
+    localconfig.vdf which can contain non-UTF-8 bytes.
+    """
+    _backup_file(path)
+    open_kwargs = {"encoding": encoding}
+    if errors:
+        open_kwargs = {"errors": errors}
+    with open(path, "w", **open_kwargs) as f:
+        f.write(data)
+    if not _validate_vdf(path):
+        _log.error("VDF corruption detected in %s after write", path)
+        return False
+    return True
 
 
 def get_proton_path(steam_root):
@@ -82,17 +234,44 @@ def get_proton_path(steam_root):
     return os.path.join(common, proton_dirs[0], "proton")
 
 
-def find_compatdata(steam_root, appid):
+def find_compatdata(steam_root, appid, game_install_dir=None):
     """
     Find the Wine prefix folder for a given Steam appid.
 
     Searches all Steam library folders (internal + SD card) so the correct
     prefix is found regardless of where the game is installed.
+
+    When game_install_dir is provided, the prefix from the same library
+    folder as the game install is preferred. This fixes the bug where
+    both internal and SD card have compatdata for the same appid —
+    without this hint, the internal drive's prefix is always returned
+    first because _all_library_dirs lists it first.
+
     Returns the path or None if not found.
     """
     from detect_games import _all_library_dirs
 
-    for steamapps_dir in _all_library_dirs(steam_root):
+    all_dirs = _all_library_dirs(steam_root)
+
+    # If we know where the game is installed, prefer the prefix from
+    # the same library folder. This ensures SD card games use the
+    # SD card prefix, not the internal drive's.
+    if game_install_dir:
+        game_norm = os.path.normpath(game_install_dir)
+        for steamapps_dir in all_dirs:
+            sa_norm = os.path.normpath(steamapps_dir)
+            # Check if the game's install_dir lives under this steamapps/
+            # e.g. /run/media/deck/SD1/steamapps/common/Call of Duty 4
+            #       starts with /run/media/deck/SD1/steamapps
+            if game_norm.startswith(sa_norm + os.sep) or game_norm.startswith(sa_norm + "/"):
+                candidate = os.path.join(steamapps_dir, "compatdata", str(appid))
+                if os.path.isdir(candidate):
+                    return candidate
+                # Game is here but no compatdata yet — break and fall
+                # through to the general scan (prefix may not exist yet)
+                break
+
+    for steamapps_dir in all_dirs:
         candidate = os.path.join(steamapps_dir, "compatdata", str(appid))
         if os.path.isdir(candidate):
             return candidate
@@ -200,7 +379,7 @@ def set_launch_options(steam_root, appid, options):
         # Steam reads LaunchOptions from here — the cloud sub-block value
         # is NOT shown in Steam properties and should never be written to.
         launch_pattern = re.compile(
-            r'("LaunchOptions"\s*")([^"]*?)(")',
+            r'("LaunchOptions"\s*")((?:[^"\\]|\\.)*)(")',
             re.IGNORECASE
         )
 
@@ -249,8 +428,8 @@ def set_launch_options(steam_root, appid, options):
             content[app_close:]
         )
 
-        with open(vdf_path, "w", errors="replace") as f:
-            f.write(new_content)
+        _write_and_validate_vdf(vdf_path, new_content, errors="replace")
+        _record_localconfig(uid, appid, "LaunchOptions", vdf_options)
 
 
 def clear_launch_options(steam_root, appid):
@@ -294,7 +473,7 @@ def clear_launch_options(steam_root, appid):
         flat_section = app_inner[:subblock_match.start()] if subblock_match else app_inner
 
         launch_pattern = re.compile(
-            r'("LaunchOptions"\s*")([^"]*?)(")',
+            r'("LaunchOptions"\s*")((?:[^"\\]|\\.)*)(")',
             re.IGNORECASE
         )
         launch_match = launch_pattern.search(flat_section)
@@ -314,43 +493,66 @@ def clear_launch_options(steam_root, appid):
             content[app_close:]
         )
 
-        with open(vdf_path, "w", errors="replace") as f:
-            f.write(new_content)
+        _write_and_validate_vdf(vdf_path, new_content, errors="replace")
+        _record_localconfig(uid, appid, "LaunchOptions", "")
 
 
-def kill_steam():
+def kill_steam(on_progress=None):
     """
-    Terminate the Steam desktop client without triggering the SteamOS
-    session manager (which would switch back to Game Mode).
+    Gracefully close the Steam desktop client without triggering the
+    SteamOS session manager (which would switch back to Game Mode).
 
-    Targets ubuntu12_32/steam directly — this is the actual main Steam
-    process on SteamOS. Killing it triggers a graceful shutdown that writes
-    localconfig.vdf cleanly, matching what happens when the user closes
-    Steam manually. All child processes (steamwebhelper, srt-logger etc.)
-    die automatically when the parent is terminated.
+    Sends SIGTERM to ubuntu12_32/steam and waits for Steam to shut
+    itself down cleanly. Never force-kills (SIGKILL) because that can
+    corrupt localconfig.vdf and trigger the SteamOS first-run wizard.
+
+    on_progress — optional callback(str) for status messages while
+                  waiting for Steam to exit.
+
+    Raises TimeoutError after 120 seconds if Steam refuses to close.
     """
     import time
+
+    # Check if Steam is even running
+    r = subprocess.run(
+        ["pgrep", "-f", "ubuntu12_32/steam"],
+        capture_output=True
+    )
+    if r.returncode != 0:
+        return  # Steam is not running
 
     # SIGTERM to the main Steam process triggers graceful shutdown + config write
     subprocess.run(["pkill", "-TERM", "-f", "ubuntu12_32/steam"], capture_output=True)
 
-    # Wait for all Steam processes to fully exit
-    deadline = time.time() + 20
+    if on_progress:
+        on_progress("Waiting for Steam to safely close itself...")
+
+    # Wait for Steam to exit on its own — never force-kill
+    deadline = time.time() + 120
+    elapsed = 0
     while time.time() < deadline:
         r = subprocess.run(
             ["pgrep", "-f", "ubuntu12_32/steam"],
             capture_output=True
         )
         if r.returncode != 0:
-            time.sleep(1)  # Brief extra wait for localconfig.vdf write to complete
+            # Steam process is gone. Wait for config writes to flush to disk.
+            # Steam writes config.vdf and localconfig.vdf during shutdown and
+            # the kernel may still be buffering those writes after the process
+            # exits. sync forces all pending I/O to complete before we touch
+            # any VDF files.
+            time.sleep(3)
+            subprocess.run(["sync"], capture_output=True)
             return
         time.sleep(1)
+        elapsed += 1
+        if on_progress and elapsed % 10 == 0:
+            on_progress("Still waiting for Steam to close safely...")
 
-    # Force kill if graceful shutdown timed out
-    subprocess.run(["pkill", "-9", "-f", "ubuntu12_32/steam"],  capture_output=True)
-    subprocess.run(["pkill", "-9", "-f", "steamwebhelper"],      capture_output=True)
-    subprocess.run(["pkill", "-9", "-f", "steam.sh"],            capture_output=True)
-    time.sleep(3)
+    raise TimeoutError(
+        "Steam did not close within 120 seconds. "
+        "Please close Steam manually and try again."
+    )
 
 
 def set_steam_input_enabled(steam_root, appids=None):
@@ -372,6 +574,7 @@ def set_steam_input_enabled(steam_root, appids=None):
         "10190",   # MW2 MP
         "42680",   # MW3 SP
         "42690",   # MW3 MP
+        "42750",   # MW3 Dedicated Server
         "42700",   # BO1
         "42710",   # BO1 MP
         "202970",  # BO2 SP
@@ -396,6 +599,7 @@ def set_steam_input_enabled(steam_root, appids=None):
             content = f.read()
 
         modified = False
+        modified_appids = []
         for appid in appids:
             key_pattern = re.compile(
                 r'"' + re.escape(appid) + r'"\s*\{',
@@ -413,7 +617,7 @@ def set_steam_input_enabled(steam_root, appids=None):
             app_block = content[app_open + 1:app_close]
 
             si_pattern = re.compile(
-                r'("UseSteamControllerConfig"\s*")([^"]*?)(")',
+                r'("UseSteamControllerConfig"\s*")((?:[^"\\]|\\.)*)(")',
                 re.IGNORECASE
             )
 
@@ -443,10 +647,12 @@ def set_steam_input_enabled(steam_root, appids=None):
                 content[app_close:]
             )
             modified = True
+            modified_appids.append(appid)
 
         if modified:
-            with open(vdf_path, "w", errors="replace") as f:
-                f.write(content)
+            _write_and_validate_vdf(vdf_path, content, errors="replace")
+            for appid in modified_appids:
+                _record_localconfig(uid, appid, "UseSteamControllerConfig", "1")
 
 
 STEAM_CONFIG = os.path.expanduser("~/.local/share/Steam/config/config.vdf")
@@ -517,8 +723,50 @@ def set_compat_tool(appids, version):
                     count=1,
                 )
 
-    with open(STEAM_CONFIG, "w", encoding="utf-8") as f:
-        f.write(data)
+    _write_and_validate_vdf(STEAM_CONFIG, data)
+    for appid in appids:
+        _record_config_vdf(str(appid), "CompatToolMapping", version)
+
+
+def clear_compat_tool(appids):
+    """
+    Remove CompatToolMapping entries for the given appids from Steam's
+    config.vdf. Inverse of set_compat_tool — used for games where Steam
+    must NOT wrap the launch in a compat tool, e.g. LCD Plutonium games
+    whose launch options invoke `flatpak run` to hand off to Heroic.
+
+    Steam wraps any launch with a CompatToolMapping entry inside Steam
+    Linux Runtime (sniper). From inside that container the host's flatpak
+    binary is invisible, so the flatpak invocation fails and the launch
+    flash-closes. Heroic owns the Proton invocation downstream, so the
+    Steam-side compat tool is not just unnecessary — it actively breaks
+    the launch.
+
+    Silently no-ops if config.vdf doesn't exist or the entry isn't there.
+    Must be called while Steam is closed so the change persists.
+
+    appids — list of int or str appids
+    """
+    if not os.path.exists(STEAM_CONFIG):
+        return
+
+    with open(STEAM_CONFIG, "r", encoding="utf-8") as f:
+        data = f.read()
+
+    modified = False
+    for appid in appids:
+        appid_str = str(appid)
+        # Same pattern as shortcut._clear_compat_tool — matches the appid
+        # block including its trailing newline so the file stays clean.
+        pattern = rf'\t+"{re.escape(appid_str)}"\n\t+\{{[^}}]*\}}\n?'
+        if re.search(pattern, data, re.MULTILINE | re.DOTALL):
+            data = re.sub(pattern, "", data, flags=re.MULTILINE | re.DOTALL)
+            modified = True
+
+    if modified:
+        _write_and_validate_vdf(STEAM_CONFIG, data)
+        for appid in appids:
+            _remove_config_vdf(str(appid), "CompatToolMapping")
 
 
 def set_default_launch_option(steam_root, appids_config):
@@ -558,7 +806,7 @@ def set_default_launch_option(steam_root, appids_config):
         # ── Step 1: set the checkbox to "1" so the Deck configurator treats
         # the launch choice as confirmed and stops showing the picker ──────────
         checkbox_pattern = re.compile(
-            r'("Deck_ConfiguratorInterstitialsCheckbox_AppLauncherInteractionIssues"\s*")([^"]*?)(")',
+            r'("Deck_ConfiguratorInterstitialsCheckbox_AppLauncherInteractionIssues"\s*")((?:[^"\\]|\\.)*)(")',
             re.IGNORECASE
         )
         if checkbox_pattern.search(content):
@@ -657,5 +905,9 @@ def set_default_launch_option(steam_root, appids_config):
                         modified = True
 
         if modified:
-            with open(vdf_path, "w", errors="replace") as f:
-                f.write(content)
+            _write_and_validate_vdf(vdf_path, content, errors="replace")
+            for appid, (hash_key, index) in appids_config.items():
+                _record_localconfig(
+                    uid, appid, "DefaultLaunchOption",
+                    json.dumps({"hash_key": hash_key, "index": index})
+                )
