@@ -1,7 +1,7 @@
 """
 bootstrap.py — DeckOps pre-launch asset fetcher
 
-Downloads Steam header images into the assets folder before the PyQt5 UI
+Downloads Steam portrait grid images into the assets folder before the PyQt5 UI
 initialises. Called from BootstrapScreen on a background thread so the UI
 can show progress.
 
@@ -36,20 +36,20 @@ FONT_FILE = "RussoOne-Regular.ttf"
 # No remote font downloads
 FONTS = {}
 
-# ── Steam header images ───────────────────────────────────────────────────────
+# ── Steam portrait grid images ────────────────────────────────────────────────
 
-_STEAM_CDN = "https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg"
+_STEAM_CDN = "https://shared.steamstatic.com/store_item_assets/steam/apps/{appid}/library_600x900_2x.jpg"
 
 # Some games have separate appids for SP and MP but share the same store
-# artwork. The MP appids below point to their SP counterpart's header image
+# artwork. The MP appids below point to their SP counterpart's portrait image
 # so we don't download duplicates or get the wrong art on the UI cards.
 _HEADER_OVERRIDES = {
-    10190:  "https://shared.steamstatic.com/store_item_assets/steam/apps/10180/header.jpg",   # MW2 MP -> MW2 SP art
-    202990: "https://shared.steamstatic.com/store_item_assets/steam/apps/202970/header.jpg",  # BO2 MP -> BO2 SP art
-    42690:  "https://shared.steamstatic.com/store_item_assets/steam/apps/42680/header.jpg",   # MW3 MP -> MW3 SP art
+    10190:  "https://shared.steamstatic.com/store_item_assets/steam/apps/10180/library_600x900_2x.jpg",   # MW2 MP -> MW2 SP art
+    202990: "https://shared.steamstatic.com/store_item_assets/steam/apps/202970/library_600x900_2x.jpg",  # BO2 MP -> BO2 SP art
+    42690:  "https://shared.steamstatic.com/store_item_assets/steam/apps/42680/library_600x900_2x.jpg",   # MW3 MP -> MW3 SP art
 }
 
-# Every appid that needs a header image cached locally.
+# Every appid that needs a portrait grid image cached locally.
 # SP and MP appids are both listed so the UI can look up either one.
 HEADER_APPIDS = [
     7940,
@@ -61,6 +61,9 @@ HEADER_APPIDS = [
     42700,
     202970,
     202990,
+    311210,
+    209160,   # Ghosts SP
+    209650,   # Advanced Warfare SP
 ]
 
 
@@ -110,8 +113,8 @@ def run(on_progress=None, on_complete=None):
 
     for appid in HEADER_APPIDS:
         url  = _HEADER_OVERRIDES.get(appid, _STEAM_CDN.format(appid=appid))
-        dest = os.path.join(HEADERS_DIR, f"{appid}.jpg")
-        tasks.append((url, dest, f"Header: {appid}.jpg"))
+        dest = os.path.join(HEADERS_DIR, f"{appid}_grid.jpg")
+        tasks.append((url, dest, f"Grid: {appid}_grid.jpg"))
 
     total     = len(tasks)
     failed    = 0
@@ -145,7 +148,7 @@ def fonts_ready() -> bool:
 
 def headers_ready() -> bool:
     return all(
-        os.path.exists(os.path.join(HEADERS_DIR, f"{appid}.jpg"))
+        os.path.exists(os.path.join(HEADERS_DIR, f"{appid}_grid.jpg"))
         for appid in HEADER_APPIDS
     )
 

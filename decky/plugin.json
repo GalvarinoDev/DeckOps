@@ -1,0 +1,11 @@
+{
+  "name": "DeckOps",
+  "author": "GalvarinoDev",
+  "flags": ["_root"],
+  "api_version": 1,
+  "publish": {
+    "tags": ["gaming", "call-of-duty", "display"],
+    "description": "Toggle between handheld and docked display configs for DeckOps-managed Call of Duty games.",
+    "image": ""
+  }
+}

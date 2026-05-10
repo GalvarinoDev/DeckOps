@@ -2,12 +2,16 @@
 iw3sp.py - DeckOps installer for IW3SP-MOD (Call of Duty 4: Modern Warfare Singleplayer)
 
 Downloads the latest iw3sp_mod release zip from Gitea, extracts it into
-the CoD4 install directory, then:
+the CoD4 install directory.
+
+For Steam games:
   - Renames iw3sp.exe -> iw3sp.exe.bak
   - Renames iw3sp_mod.exe -> iw3sp.exe
+  This lets Steam launch IW3SP-MOD transparently via the existing SP shortcut.
 
-This lets Steam launch IW3SP-MOD transparently via the existing SP shortcut
-with no launch options or localconfig.vdf writes required.
+For own games:
+  - Extracts the zip but skips the exe rename
+  - The non-Steam shortcut already points at iw3sp_mod.exe directly
 
 Progress is reported via a callback:
     on_progress(percent: int, status: str)
@@ -16,43 +20,53 @@ Progress is reported via a callback:
 import os
 import json
 import shutil
-import zipfile
 import urllib.request
+import zipfile
 
-BASE_URL      = "https://gitea.com/JerryALT/iw3sp_mod/releases/download/v4.1.5/iw3sp_mod_v4.1.5.zip"
+from net import download as _download, BROWSER_UA as _BROWSER_UA
+
+GITEA_API     = "https://gitea.com/api/v1/repos/JerryALT/iw3sp_mod/releases?limit=5"
 METADATA_FILE = "deckops_iw3sp.json"
-
-_BROWSER_UA = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept": "*/*",
-}
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
-def _download(url: str, dest: str, on_progress=None, label: str = ""):
-    """Download url to dest with progress callback. Retries up to 3 times."""
-    import time
-    for attempt in range(3):
-        try:
-            req = urllib.request.Request(url, headers=_BROWSER_UA)
-            with urllib.request.urlopen(req, timeout=60) as r:
-                total = int(r.headers.get("Content-Length", 0))
-                downloaded = 0
-                with open(dest, "wb") as f:
-                    while True:
-                        chunk = r.read(1024 * 1024)
-                        if not chunk:
-                            break
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        if on_progress and total:
-                            on_progress(int(downloaded / total * 100), label)
-            return
-        except Exception as ex:
-            if attempt == 2:
-                raise
-            time.sleep(2 ** attempt)
+def _get_latest_release():
+    """
+    Query the Gitea API for the latest stable IW3SP-MOD release.
+
+    Gitea doesn't have a /releases/latest endpoint like GitHub, so we
+    fetch the most recent releases and pick the first one that is not a
+    draft or prerelease.
+
+    Returns (version, zip_url) or raises on failure.
+    """
+    req = urllib.request.Request(GITEA_API, headers=_BROWSER_UA)
+    with urllib.request.urlopen(req, timeout=30) as r:
+        releases = json.loads(r.read().decode("utf-8"))
+
+    for release in releases:
+        if release.get("draft") or release.get("prerelease"):
+            continue
+
+        tag = release.get("tag_name", "")
+        version = tag.lstrip("v") if tag else "unknown"
+
+        # Find the .zip asset (not source code archives)
+        for asset in release.get("assets", []):
+            name = asset.get("name", "")
+            if name.endswith(".zip"):
+                return version, asset["browser_download_url"]
+
+        # No uploaded zip asset — fall back to the source zipball
+        zipball = release.get("zipball_url")
+        if zipball:
+            return version, zipball
+
+    raise RuntimeError("No stable IW3SP-MOD release found on Gitea")
+
+
+# _download and _BROWSER_UA imported from net.py.
 
 
 def is_iw3sp_installed(install_dir: str) -> bool:
@@ -64,19 +78,22 @@ def is_iw3sp_installed(install_dir: str) -> bool:
 
 def install_iw3sp(game: dict, steam_root: str,
                   proton_path: str, compatdata_path: str,
-                  on_progress=None):
+                  on_progress=None, source: str = "steam"):
     """
     Install IW3SP-MOD for Call of Duty 4 singleplayer.
 
-    Downloads and extracts the mod zip into the CoD4 install directory, then
-    renames iw3sp.exe -> iw3sp.exe.bak and iw3sp_mod.exe -> iw3sp.exe so
-    Steam launches the mod transparently. No launch options are written.
+    Downloads and extracts the mod zip into the CoD4 install directory.
+    For Steam games, renames iw3sp.exe -> iw3sp.exe.bak and
+    iw3sp_mod.exe -> iw3sp.exe so Steam launches the mod transparently.
+    For own games, skips the rename -- the shortcut points at
+    iw3sp_mod.exe directly.
 
-    game            — entry from detect_games.find_installed_games()
+    game            — entry from detect_games
     steam_root      — path to Steam root (kept for API consistency)
     proton_path     — path to the proton executable (kept for API consistency)
     compatdata_path — path to the CoD4 compatdata prefix (kept for API consistency)
     on_progress     — optional callback(percent: int, status: str)
+    source          — "steam" or "own", controls whether exe rename happens
     """
     install_dir = game["install_dir"]
     zip_dest    = os.path.join(install_dir, "iw3sp_mod.zip")
@@ -85,13 +102,20 @@ def install_iw3sp(game: dict, steam_root: str,
         if on_progress:
             on_progress(pct, msg)
 
+    # Fetch latest release info from Gitea API
+    prog(2, "Checking for latest IW3SP-MOD release...")
+    try:
+        version, zip_url = _get_latest_release()
+    except Exception as ex:
+        raise RuntimeError(f"Failed to fetch IW3SP-MOD release info: {ex}")
+
     # Download zip
-    prog(5, "Downloading IW3SP-MOD...")
+    prog(5, f"Downloading IW3SP-MOD v{version}...")
     _download(
-        BASE_URL,
+        zip_url,
         zip_dest,
         lambda p, m: prog(5 + int(p * 0.55), m),
-        "Downloading IW3SP-MOD...",
+        f"Downloading IW3SP-MOD v{version}...",
     )
 
     # Extract into CoD4 root
@@ -100,30 +124,31 @@ def install_iw3sp(game: dict, steam_root: str,
         zf.extractall(install_dir)
     os.remove(zip_dest)
 
-    iw3sp     = os.path.join(install_dir, "iw3sp.exe")
-    iw3sp_bak = os.path.join(install_dir, "iw3sp.exe.bak")
-    iw3sp_mod = os.path.join(install_dir, "iw3sp_mod.exe")
+    # Rename iw3sp.exe -> iw3sp.exe.bak and iw3sp_mod.exe -> iw3sp.exe
+    # Steam games: swap so Steam launches the mod transparently.
+    # Own games: skip -- the shortcut points at iw3sp_mod.exe directly
+    # and the original exe may not even exist.
+    if source != "own":
+        iw3sp     = os.path.join(install_dir, "iw3sp.exe")
+        iw3sp_bak = os.path.join(install_dir, "iw3sp.exe.bak")
+        iw3sp_mod = os.path.join(install_dir, "iw3sp_mod.exe")
 
-    # Rename iw3sp.exe -> iw3sp.exe.bak (only if not already done)
-    # This is how Steam launches IW3SP-MOD transparently. Steam always runs
-    # iw3sp.exe, so by putting the mod exe in its place we avoid needing
-    # launch options or localconfig.vdf writes. The backup lets us restore
-    # the original on uninstall.
-    prog(80, "Replacing iw3sp.exe...")
-    if os.path.exists(iw3sp) and not os.path.exists(iw3sp_bak):
-        os.rename(iw3sp, iw3sp_bak)
+        prog(80, "Replacing iw3sp.exe...")
+        if os.path.exists(iw3sp) and not os.path.exists(iw3sp_bak):
+            os.rename(iw3sp, iw3sp_bak)
 
-    # Rename iw3sp_mod.exe -> iw3sp.exe
-    if os.path.exists(iw3sp_mod):
-        os.rename(iw3sp_mod, iw3sp)
+        if os.path.exists(iw3sp_mod):
+            os.rename(iw3sp_mod, iw3sp)
+    else:
+        prog(80, "Own game -- skipping exe rename")
 
     # Write metadata
     prog(95, "Saving metadata...")
     meta_path = os.path.join(install_dir, METADATA_FILE)
     with open(meta_path, "w") as f:
-        json.dump({"version": "4.1.5"}, f, indent=2)
+        json.dump({"version": version}, f, indent=2)
 
-    prog(100, "IW3SP-MOD installation complete!")
+    prog(100, f"IW3SP-MOD v{version} installation complete!")
 
 
 def uninstall_iw3sp(game: dict):

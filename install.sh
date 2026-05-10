@@ -20,16 +20,31 @@ die()     {
 }
 
 # ── config ────────────────────────────────────────────────────────────────────
-GITHUB_USER="GalvarinoDev"
-GITHUB_REPO="DeckOps"
-INSTALL_DIR="$HOME/DeckOps"
-VENV_DIR="$INSTALL_DIR/.venv"
-VENV_PYTHON="$VENV_DIR/bin/python3"
-ENTRY_POINT="$INSTALL_DIR/src/main.py"
-ICON_PATH="$INSTALL_DIR/assets/images/icon.png"
-MUSIC_DIR="$INSTALL_DIR/assets/music"
-DESKTOP_FILE="$HOME/.local/share/applications/deckops.desktop"
-DESKTOP_SHORTCUT="$HOME/Desktop/DeckOps.desktop"
+# Source deckops_identity.sh if available (normal install path).
+# Fallback for curl-piped installs where identity.sh isn't on disk yet.
+# These fallback values must match deckops_identity.sh and be updated together.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$SCRIPT_DIR/deckops_identity.sh" ]; then
+    source "$SCRIPT_DIR/deckops_identity.sh"
+elif [ -f "$HOME/DeckOps-Nightly/deckops_identity.sh" ]; then
+    source "$HOME/DeckOps-Nightly/deckops_identity.sh"
+elif [ -f "$HOME/DeckOps/deckops_identity.sh" ]; then
+    source "$HOME/DeckOps/deckops_identity.sh"
+else
+    GITHUB_USER="GalvarinoDev"
+    GITHUB_REPO="DeckOps-Nightly"
+    INSTALL_DIR="$HOME/DeckOps-Nightly"
+    VENV_DIR="$INSTALL_DIR/.venv"
+    VENV_PYTHON="$VENV_DIR/bin/python3"
+    ENTRY_POINT="$INSTALL_DIR/src/main.py"
+    ICON_PATH="$INSTALL_DIR/assets/images/icon.png"
+    MUSIC_DIR="$INSTALL_DIR/assets/music"
+    APP_TITLE="DeckOps Nightly"
+    DESKTOP_COMMENT="DeckOps Nightly — Experimental build"
+    BUILD_FALLBACK="nightly"
+    DESKTOP_FILE="$HOME/.local/share/applications/deckops-nightly.desktop"
+    DESKTOP_SHORTCUT="$HOME/Desktop/DeckOps-Nightly.desktop"
+fi
 
 MUSIC_URL="https://archive.org/download/adrenaline-klickaud/Adrenaline_KLICKAUD.mp3"
 MUSIC_FILE="background.mp3"
@@ -43,7 +58,7 @@ echo -e "${BOLD}  ██║  ██║██╔══╝  ██║     ██�
 echo -e "${BOLD}  ██████╔╝███████╗╚██████╗██║  ██╗╚██████╔╝██║     ███████║${CLEAR}"
 echo -e "${BOLD}  ╚═════╝ ╚══════╝ ╚═════╝╚═╝  ╚═╝ ╚═════╝ ╚═╝     ╚══════╝${CLEAR}"
 echo ""
-echo -e "  ${YELLOW}DeckOps — Installer${CLEAR}"
+echo -e "  ${YELLOW}${APP_TITLE:-DeckOps Nightly} — Installer${CLEAR}"
 echo ""
 
 # ── step 1: check core dependencies ──────────────────────────────────────────
@@ -80,6 +95,17 @@ rm -rf "$TMPDIR_EXTRACT"
 
 chmod +x "$ENTRY_POINT" 2>/dev/null || true
 success "DeckOps installed to $INSTALL_DIR"
+
+# ── step 3b: write build info ─────────────────────────────────────────────
+# Short commit hash + date, read by the Settings screen's About section.
+# Uses the downloaded archive's HEAD, not a local git repo.
+BUILD_DATE=$(date '+%b %d, %Y')
+BUILD_HASH="${BUILD_FALLBACK:-nightly}"
+if command -v git &>/dev/null && [ -d "$INSTALL_DIR/.git" ]; then
+    BUILD_HASH=$(cd "$INSTALL_DIR" && git rev-parse --short HEAD 2>/dev/null || echo "${BUILD_FALLBACK:-nightly}")
+fi
+echo "$BUILD_HASH ($BUILD_DATE)" > "$INSTALL_DIR/BUILD"
+success "Build info written: $BUILD_HASH ($BUILD_DATE)"
 
 # ── step 4: download background music ────────────────────────────────────────
 info "Downloading background music..."
@@ -132,6 +158,15 @@ else
     success "vdf already installed."
 fi
 
+if ! "$VENV_PYTHON" -c "import evdev" &>/dev/null 2>&1; then
+    info "Installing evdev-binary..."
+    "$VENV_DIR/bin/pip" install --quiet evdev-binary \
+        || warn "Failed to install evdev-binary — gamepad input in Plutonium Launcher will not work."
+    success "evdev-binary installed."
+else
+    success "evdev already installed."
+fi
+
 # ── step 6: .desktop entry ────────────────────────────────────────────────────
 info "Creating application shortcut..."
 
@@ -139,8 +174,8 @@ mkdir -p "$(dirname "$DESKTOP_FILE")"
 
 cat > "$DESKTOP_FILE" << DEOF
 [Desktop Entry]
-Name=DeckOps
-Comment=DeckOps — Community COD launcher for Steam Deck
+Name=${APP_TITLE:-DeckOps Nightly}
+Comment=${DESKTOP_COMMENT:-DeckOps Nightly — Experimental build}
 Exec=$VENV_PYTHON $ENTRY_POINT
 Icon=$ICON_PATH
 Terminal=false
@@ -158,110 +193,70 @@ if [ -d "$HOME/Desktop" ]; then
     success "Desktop shortcut created."
 fi
 
-# ── step 7: add to Steam ──────────────────────────────────────────────────────
-info "Adding DeckOps to Steam library..."
+# ── step 7: sweep stale plut_lan.sh sidecars ─────────────────────────────────
+# Pre-Pass-1 installs wrote <gametag>plut_lan.sh into game install dirs at
+# install time (OLED offline-mode plumbing). Pass 1 stopped creating them but
+# left existing files on disk. Sweep all known Steam libraries (internal +
+# libraryfolders.vdf entries + SD card mounts) and remove them.
+info "Sweeping stale plut_lan.sh sidecars..."
 
-IN_GAME_MODE=0
-pgrep -x "gamescope" > /dev/null 2>&1 && IN_GAME_MODE=1
+STEAM_ROOT_FOR_SWEEP=""
+for r in "$HOME/.local/share/Steam" "$HOME/.steam/steam" "$HOME/.steam/root"; do
+    if [ -d "$r/steamapps" ]; then
+        STEAM_ROOT_FOR_SWEEP="$r"
+        break
+    fi
+done
 
-add_to_steam() {
-    python3 - << PYEOF
-import os, struct, time
+LAN_SWEEP_DIRS=()
+[ -n "$STEAM_ROOT_FOR_SWEEP" ] && LAN_SWEEP_DIRS+=("$STEAM_ROOT_FOR_SWEEP/steamapps/common")
 
-def find_shortcuts_vdf():
-    steam_paths = [
-        os.path.expanduser("~/.local/share/Steam"),
-        os.path.expanduser("~/.steam/steam"),
-        os.path.expanduser("~/.steam/root"),
-    ]
-    for steam in steam_paths:
-        userdata = os.path.join(steam, "userdata")
-        if not os.path.exists(userdata):
-            continue
-        for uid in os.listdir(userdata):
-            vdf = os.path.join(userdata, uid, "config", "shortcuts.vdf")
-            cfg_dir = os.path.join(userdata, uid, "config")
-            if os.path.exists(vdf) or os.path.exists(cfg_dir):
-                return vdf
-    return None
-
-def string_field(key, val):
-    return b'\x01' + key.encode() + b'\x00' + val.encode() + b'\x00'
-
-def int_field(key, val):
-    return b'\x02' + key.encode() + b'\x00' + struct.pack('<I', val)
-
-def make_entry(index, name, exe, icon, start_dir):
-    e  = b'\x00' + str(index).encode() + b'\x00'
-    e += string_field('appname', name)
-    e += string_field('exe', exe)
-    e += string_field('StartDir', start_dir)
-    e += string_field('icon', icon)
-    e += string_field('ShortcutPath', '')
-    e += string_field('LaunchOptions', '')
-    e += int_field('IsHidden', 0)
-    e += int_field('AllowDesktopConfig', 1)
-    e += int_field('AllowOverlay', 1)
-    e += int_field('OpenVR', 0)
-    e += int_field('Devkit', 0)
-    e += string_field('DevkitGameID', '')
-    e += int_field('LastPlayTime', int(time.time()))
-    e += b'\x00tags\x00\x08'
-    e += b'\x08'
-    return e
-
-vdf = find_shortcuts_vdf()
-if not vdf:
-    print("WARN: shortcuts.vdf not found — add DeckOps to Steam manually.")
-    exit(0)
-
-home      = os.path.expanduser('~')
-name      = "DeckOps"
-exe       = f"{home}/DeckOps/.venv/bin/python3 {home}/DeckOps/src/main.py"
-icon      = f"{home}/DeckOps/assets/images/icon.png"
-start_dir = f"{home}/DeckOps"
-
-if os.path.exists(vdf):
-    data = open(vdf, 'rb').read()
-    if b'DeckOps' in data:
-        print("Already in Steam shortcuts.")
-        exit(0)
-    existing = data[:-2] if data.endswith(b'\x08\x08') else data
-    index = existing.count(b'\x00appname\x00')
-else:
-    os.makedirs(os.path.dirname(vdf), exist_ok=True)
-    existing = b'\x00shortcuts\x00'
-    index = 0
-
-updated = existing + make_entry(index, name, exe, icon, start_dir) + b'\x08\x08'
-open(vdf, 'wb').write(updated)
-print(f"Added as entry {index}.")
-PYEOF
-}
-
-if [ "$IN_GAME_MODE" -eq 1 ]; then
-    add_to_steam
-    success "Steam shortcut written. Restart Steam to see DeckOps in your library."
-else
-    echo ""
-    warn "Steam needs to be closed to add DeckOps to your library."
-    read -r -p "  Is Steam closed? Press Y to add, N to skip: " answer
-    case "$answer" in
-        [yY]*)
-            add_to_steam
-            success "Steam shortcut written. Launch Steam and DeckOps will be in your library."
-            ;;
-        *)
-            warn "Skipped. To add manually: Steam → Add a Non-Steam Game → $ENTRY_POINT"
-            ;;
-    esac
+LF_VDF_SWEEP="$STEAM_ROOT_FOR_SWEEP/steamapps/libraryfolders.vdf"
+if [ -f "$LF_VDF_SWEEP" ]; then
+    while IFS= read -r libpath; do
+        [ -d "$libpath/steamapps/common" ] && LAN_SWEEP_DIRS+=("$libpath/steamapps/common")
+        [ -d "$libpath/SteamLibrary/steamapps/common" ] && LAN_SWEEP_DIRS+=("$libpath/SteamLibrary/steamapps/common")
+    done < <(sed -n 's/.*"path"[[:space:]]*"\([^"]*\)".*/\1/p' "$LF_VDF_SWEEP")
 fi
 
-# ── step 8: launch DeckOps ────────────────────────────────────────────────────
+for mount in /run/media/deck/*/steamapps/common /run/media/deck/*/SteamLibrary/steamapps/common; do
+    [ -d "$mount" ] && LAN_SWEEP_DIRS+=("$mount")
+done
+
+lan_removed=0
+for common_dir in "${LAN_SWEEP_DIRS[@]}"; do
+    while IFS= read -r -d '' sidecar; do
+        if rm -f "$sidecar" 2>/dev/null; then
+            info "  Removed: $sidecar"
+            lan_removed=$((lan_removed + 1))
+        fi
+    done < <(find "$common_dir" -maxdepth 2 -name "*plut_lan.sh" -print0 2>/dev/null)
+done
+
+if [ "$lan_removed" -gt 0 ]; then
+    success "Removed $lan_removed stale plut_lan.sh sidecar(s)."
+else
+    success "No stale plut_lan.sh sidecars found."
+fi
+
+# ── step 8: write initial version SHA ─────────────────────────────────────────
+# So the first launch doesn't redundantly re-download everything.
+info "Recording current version..."
+INITIAL_SHA=$(curl -sf --max-time 10 \
+    "https://api.github.com/repos/$GITHUB_USER/$GITHUB_REPO/commits/main" \
+    | grep -m1 '"sha"' | cut -d'"' -f4)
+if [ -n "$INITIAL_SHA" ]; then
+    echo "$INITIAL_SHA" > "$INSTALL_DIR/VERSION"
+    success "Version recorded."
+else
+    warn "Could not fetch version SHA — will be set on first update."
+fi
+
+# ── step 9: done ─────────────────────────────────────────────────────────────
 echo ""
-echo -e "${GREEN}${BOLD}  Installation complete! Welcome to DeckOps.${CLEAR}"
+echo -e "${GREEN}${BOLD}  Download Complete! Welcome to DeckOps.${CLEAR}"
 echo ""
-echo -e "  ${CYAN}Launching DeckOps now...${CLEAR}"
+echo -e "  ${CYAN}Launching DeckOps...${CLEAR}"
 echo ""
 
 nohup "$VENV_PYTHON" "$ENTRY_POINT" > /dev/null 2>&1 &

@@ -1,16 +1,9 @@
-# Python
-src/__pycache__/
+__pycache__/
 *.pyc
-*.pyo
-
-# DeckOps runtime files
-deckops.json
-assets/images/headers/
-assets/music/
-
-# Virtual environment
 .venv/
-
-# Temp files
-*.tmp
-*.log
+deckops.json
+logs/
+assets/music/background.mp3
+*.egg-info/
+.update/
+decky/node_modules/

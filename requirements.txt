@@ -1,3 +1,4 @@
 PyQt5>=5.15.0
 pygame>=2.0.0
 vdf>=3.4
+evdev-binary>=1.6.0
