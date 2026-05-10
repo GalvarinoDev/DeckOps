@@ -24,12 +24,16 @@ Per-device Neptune templates (only the matching variant is installed):
     Standard (SD LCD/OLED, Legion Go S, generic):
         controller_neptune_deckops_{ads,off,hold,toggle}.vdf
         controller_neptune_deckops_other_{ads,off,hold,toggle}.vdf
-    Legion (Go 1/2 — 4 paddles, no left touchpad):
+    Legion (Go 1 — 4 paddles, no left touchpad):
         controller_neptune_deckops_legion_{ads,off}.vdf
         controller_neptune_deckops_legion_other_{ads,off}.vdf
     2btn (ROG Ally, MSI Claw — 2 paddles, no touchpad):
         controller_neptune_deckops_2btn_{ads,off}.vdf
         controller_neptune_deckops_2btn_other_{ads,off}.vdf
+
+Per-device SteamOS Handheld templates (Legion Go 2 only):
+    controller_steamos_handheld_deckops_legion_{ads,off}.vdf
+    controller_steamos_handheld_deckops_legion_other_{ads,off}.vdf
 
 Steam Machine uses triton templates as its PRIMARY controller (not external).
     assign_controller_profiles() returns triton VDFs via _profile_filename()
@@ -126,11 +130,19 @@ NEPTUNE_STANDARD = [
 ]
 
 NEPTUNE_LEGION = [
-    # Legion (Go 1/2 — 4 paddles, no left touchpad)
+    # Legion (Go 1 — 4 paddles, no left touchpad)
     "controller_neptune_deckops_legion_ads.vdf",
     "controller_neptune_deckops_legion_off.vdf",
     "controller_neptune_deckops_legion_other_ads.vdf",
     "controller_neptune_deckops_legion_other_off.vdf",
+]
+
+STEAMOS_HANDHELD_LEGION = [
+    # SteamOS Handheld (Legion Go 2 — controller_steamos_handheld type)
+    "controller_steamos_handheld_deckops_legion_ads.vdf",
+    "controller_steamos_handheld_deckops_legion_off.vdf",
+    "controller_steamos_handheld_deckops_legion_other_ads.vdf",
+    "controller_steamos_handheld_deckops_legion_other_off.vdf",
 ]
 
 NEPTUNE_2BTN = [
@@ -301,6 +313,22 @@ def _get_deck_serial() -> str | None:
     return None
 
 
+def _primary_configset_name() -> tuple[str, str]:
+    """Return (canonical_vdf_basename, configset_filename) for the primary controller.
+
+    Legion Go 2 uses controller_steamos_handheld; everything else uses
+    controller_neptune.  The canonical VDF basename is what gets written
+    into the numbered appid folder (e.g. controller_neptune.vdf).
+    The configset filename is the configset file that gets patched.
+    """
+    import config as cfg
+    if cfg.is_other() and cfg.get_other_device_type() == "legion_go_2":
+        return ("controller_steamos_handheld.vdf",
+                "configset_controller_steamos_handheld.vdf")
+    return ("controller_neptune.vdf",
+            "configset_controller_neptune.vdf")
+
+
 def _profile_filename(profile_type: str, gyro_mode: str) -> list[str]:
     """Return the list of primary controller VDF filenames for a profile type and gyro mode.
 
@@ -308,8 +336,9 @@ def _profile_filename(profile_type: str, gyro_mode: str) -> list[str]:
         Supports full hold/toggle (same suffix mapping as standard Neptune).
 
     Checks other_device_type when the device is "other" (non-Steam Deck):
-        legion_go  -> Neptune Legion templates (no left touchpad)
-        2btn       -> Neptune 2btn templates (2 paddles, no touchpad)
+        legion_go    -> Neptune Legion templates (no left touchpad)
+        legion_go_2  -> SteamOS Handheld Legion templates
+        2btn         -> Neptune 2btn templates (2 paddles, no touchpad)
         legion_go_s / generic -> standard Neptune (fallback)
 
     Gyro mode mapping for standard Neptune and triton:
@@ -319,8 +348,8 @@ def _profile_filename(profile_type: str, gyro_mode: str) -> list[str]:
         "off"    -> off   (no gyro)
 
     Hold and toggle VDFs only exist for standard Neptune, and triton.
-    Legion and 2btn devices only have ads/off variants — hold/toggle
-    falls back to ads for those devices.
+    Legion, legion_go_2, and 2btn devices only have ads/off variants —
+    hold/toggle falls back to ads for those devices.
     """
     # Map gyro_mode to VDF filename suffix
     _SUFFIX_MAP = {"on": "ads", "hold": "hold", "toggle": "toggle"}
@@ -337,12 +366,16 @@ def _profile_filename(profile_type: str, gyro_mode: str) -> list[str]:
     # Check if this is a non-Deck device with a specific controller variant
     if cfg.is_other():
         device_type = cfg.get_other_device_type()
-        # Legion and 2btn only have ads/off — no hold/toggle VDFs
+        # Legion, legion_go_2, and 2btn only have ads/off — no hold/toggle VDFs
         other_suffix = "ads" if gyro_mode in ("on", "hold", "toggle") else "off"
         if device_type == "legion_go":
             if profile_type == "other":
                 return [f"controller_neptune_deckops_legion_other_{other_suffix}.vdf"]
             return [f"controller_neptune_deckops_legion_{other_suffix}.vdf"]
+        elif device_type == "legion_go_2":
+            if profile_type == "other":
+                return [f"controller_steamos_handheld_deckops_legion_other_{other_suffix}.vdf"]
+            return [f"controller_steamos_handheld_deckops_legion_{other_suffix}.vdf"]
         elif device_type == "2btn":
             if profile_type == "other":
                 return [f"controller_neptune_deckops_2btn_other_{other_suffix}.vdf"]
@@ -458,9 +491,10 @@ def install_controller_templates(on_progress=None):
     Copy DeckOps controller templates into Steam's global templates directory.
 
     Always installs universal templates (PS5, PS4, Xbox, Generic, Triton).
-    Only installs the Neptune variant matching the user's device:
+    Only installs the Neptune/SteamOS Handheld variant matching the user's device:
         Steam Deck LCD/OLED, Legion Go S, generic -> Neptune standard
-        Legion Go 1/2                             -> Neptune Legion
+        Legion Go 1                               -> Neptune Legion
+        Legion Go 2                               -> SteamOS Handheld Legion
         ROG Ally, MSI Claw                        -> Neptune 2btn
         Steam Machine                             -> none (uses triton)
 
@@ -473,7 +507,7 @@ def install_controller_templates(on_progress=None):
 
     import config as cfg
 
-    # Build the full list: universal + device-specific Neptune
+    # Build the full list: universal + device-specific
     to_install = list(TEMPLATES)
 
     model = cfg.get_deck_model() or "oled"
@@ -484,6 +518,8 @@ def install_controller_templates(on_progress=None):
         device_type = cfg.get_other_device_type()
         if device_type == "legion_go":
             to_install += NEPTUNE_LEGION
+        elif device_type == "legion_go_2":
+            to_install += STEAMOS_HANDHELD_LEGION
         elif device_type == "2btn":
             to_install += NEPTUNE_2BTN
         else:
@@ -554,6 +590,9 @@ def assign_controller_profiles(gyro_mode: str, on_progress=None):
     except Exception as ex:
         prog(f"  ⚠ Could not detect shortcut appids: {ex}")
 
+    # Resolve the primary controller type (neptune vs steamos_handheld)
+    canonical_vdf, configset_filename = _primary_configset_name()
+
     for uid in uids:
         config_root    = os.path.join(
             STEAM_DIR, "userdata", uid, "241100", "remote", "controller_config"
@@ -561,7 +600,7 @@ def assign_controller_profiles(gyro_mode: str, on_progress=None):
         steam_cfg_root = os.path.join(
             STEAM_DIR, "steamapps", "common", "Steam Controller Configs", uid, "config"
         )
-        configset_neptune = os.path.join(steam_cfg_root, "configset_controller_neptune.vdf")
+        configset_primary = os.path.join(steam_cfg_root, configset_filename)
         configset_serial  = os.path.join(steam_cfg_root, f"configset_{serial}.vdf") if serial else None
 
         for appid, profile_type in APPID_PROFILE_MAP.items():
@@ -585,19 +624,20 @@ def assign_controller_profiles(gyro_mode: str, on_progress=None):
                     shutil.copy2(src, dest)
 
             # Path 2: numbered appid folder under Steam Controller Configs
-            # Writes controller_neptune.vdf so Steam can find the profile
-            # even if the configset patching has not taken effect yet.
+            # Writes the canonical VDF (controller_neptune.vdf or
+            # controller_steamos_handheld.vdf) so Steam can find the
+            # profile even if the configset patching has not taken effect yet.
             cfg_dir_num = os.path.join(steam_cfg_root, appid)
             os.makedirs(cfg_dir_num, exist_ok=True)
-            shutil.copy2(src_primary, os.path.join(cfg_dir_num, "controller_neptune.vdf"))
+            shutil.copy2(src_primary, os.path.join(cfg_dir_num, canonical_vdf))
 
             # Path 3: patch configset files -- this sets the active default
-            _patch_configset(configset_neptune, appid, primary_filename)
+            _patch_configset(configset_primary, appid, primary_filename)
             if configset_serial:
                 _patch_configset(configset_serial, appid, primary_filename)
 
             for named_key in APPID_NAMED_KEYS.get(appid, []):
-                _patch_configset(configset_neptune, named_key, primary_filename)
+                _patch_configset(configset_primary, named_key, primary_filename)
                 if configset_serial:
                     _patch_configset(configset_serial, named_key, primary_filename)
 
@@ -627,9 +667,9 @@ def assign_controller_profiles(gyro_mode: str, on_progress=None):
 
             cfg_dir_num = os.path.join(steam_cfg_root, shortcut_appid)
             os.makedirs(cfg_dir_num, exist_ok=True)
-            shutil.copy2(src_primary, os.path.join(cfg_dir_num, "controller_neptune.vdf"))
+            shutil.copy2(src_primary, os.path.join(cfg_dir_num, canonical_vdf))
 
-            _patch_configset(configset_neptune, shortcut_appid, primary_filename)
+            _patch_configset(configset_primary, shortcut_appid, primary_filename)
             if configset_serial:
                 _patch_configset(configset_serial, shortcut_appid, primary_filename)
 
@@ -694,7 +734,7 @@ def assign_controller_profiles(gyro_mode: str, on_progress=None):
                     steam_cfg_root = os.path.join(
                         STEAM_DIR, "steamapps", "common", "Steam Controller Configs", uid, "config"
                     )
-                    configset_neptune = os.path.join(steam_cfg_root, "configset_controller_neptune.vdf")
+                    configset_own = os.path.join(steam_cfg_root, configset_filename)
                     configset_serial_path = os.path.join(steam_cfg_root, f"configset_{serial}.vdf") if serial else None
 
                     dest_dir = os.path.join(config_root, shortcut_appid)
@@ -704,7 +744,7 @@ def assign_controller_profiles(gyro_mode: str, on_progress=None):
                         if os.path.exists(src):
                             shutil.copy2(src, os.path.join(dest_dir, filename))
 
-                    _patch_configset(configset_neptune, shortcut_appid, primary_filename)
+                    _patch_configset(configset_own, shortcut_appid, primary_filename)
                     if configset_serial_path:
                         _patch_configset(configset_serial_path, shortcut_appid, primary_filename)
 

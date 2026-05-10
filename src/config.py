@@ -27,7 +27,7 @@ DEFAULTS = {
     "other_device": None,         # resolution key for non-Deck devices and Steam Machine, e.g.
                                   # "1920x1200", "1920x1200_144hz", "1920x1080", "1280x720"
     "other_device_type": None,    # device type for controller profile selection:
-                                  # "legion_go", "legion_go_s", "2btn", "generic", "steam_machine"
+                                  # "legion_go", "legion_go_2", "legion_go_s", "2btn", "generic", "steam_machine"
     "gyro_mode":  None,          # "on" or "off"
     "play_mode":  None,          # "handheld" or "docked"
     "external_controller": None, # "playstation", "xbox", "steamcontroller", or "other" -- only used when play_mode is "docked"
@@ -200,7 +200,7 @@ def set_other_device(device: str):
 def get_other_device_type() -> str | None:
     """Returns the device type for controller profile selection.
 
-    Values: 'legion_go', 'legion_go_s', '2btn', 'generic',
+    Values: 'legion_go', 'legion_go_2', 'legion_go_s', '2btn', 'generic',
             'steam_machine', or None.
     Used by controller_profiles.py to pick the correct profile variant.
     """
@@ -210,7 +210,8 @@ def get_other_device_type() -> str | None:
 def set_other_device_type(device_type: str):
     """Save the device type for controller profile selection.
 
-    device_type -- 'legion_go' (Go 1/2), 'legion_go_s', '2btn' (ROG Ally,
+    device_type -- 'legion_go' (Go 1), 'legion_go_2' (Go 2),
+                   'legion_go_s', '2btn' (ROG Ally,
                    MSI Claw), 'generic', or 'steam_machine'
     """
     config = load()
