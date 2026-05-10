@@ -12,7 +12,7 @@
 
 ## 🚧 Stable is Under Construction
 
-DeckOps Stable is being rebuilt from the ground up. In the meantime, please use **[DeckOps Nightly](https://github.com/GalvarinoDev/DeckOps-Nightly)** — it includes everything Stable had plus LCD online play, additional games (Ghosts, Advanced Warfare, Black Ops III), multi-device support, and more.
+DeckOps Stable is being rebuilt from the ground up. In the meantime, please use **[DeckOps Nightly](https://github.com/GalvarinoDev/DeckOps-Nightly)** it includes everything Stable had plus LCD online play, additional games (Ghosts, Advanced Warfare, Black Ops III), multi-device support, and more.
 
 ### Install DeckOps Nightly
 
