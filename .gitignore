@@ -1,9 +1,0 @@
-__pycache__/
-*.pyc
-.venv/
-deckops.json
-logs/
-assets/music/background.mp3
-*.egg-info/
-.update/
-decky/node_modules/
