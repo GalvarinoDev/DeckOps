@@ -78,8 +78,9 @@ def build_copy(game_dir):
     os.makedirs(c, exist_ok=True)
     for e in os.listdir(game_dir):
         p, low = os.path.join(game_dir, e), e.lower()
+        # cod1x.dll in a UO folder is CoDUOx's. A link would let _fetch_client write CoD1x over it
         if os.path.isfile(p) and (low == "localization.txt" or
-                                  low.endswith(".dll") and not low.startswith(("iw-pad", "uo_"))):
+                                  low.endswith(".dll") and low != "cod1x.dll" and not low.startswith(("iw-pad", "uo_"))):
             _link(p, os.path.join(c, e))
     miles = _child(game_dir, "miles")
     if os.path.isdir(miles):
