@@ -79,9 +79,11 @@ C_DARK_BTN = "#33333F"
 C_RED_BTN  = "#7A1515"
 C_BLUE_BTN = "#1A5FAA"
 
-# Accent: orange on every branch. Only the badge text tells branches apart.
+# Accent: orange on every branch. Only the branch badges change: green for stable.
 C_ACCENT    = C_TREY
 C_ACCENT_BG = "#2A1A08"
+C_BADGE     = C_IW if BRANCH == "stable" else C_TREY
+C_BADGE_BG  = "#0A2A08" if BRANCH == "stable" else "#2A1A08"
 
 
 # ── Fonts ─────────────────────────────────────────────────────────────────────
@@ -358,7 +360,7 @@ def _header_bar():
     t.setStyleSheet("color:#FFF;background:transparent;"); hl.addWidget(t)
     b = QLabel(BRANCH.upper()); b.setFont(font(10, bold=True))
     b.setStyleSheet(
-        f"color:{C_ACCENT};background:{C_ACCENT_BG};border:1px solid {C_ACCENT};"
+        f"color:{C_BADGE};background:{C_BADGE_BG};border:1px solid {C_BADGE};"
         "border-radius:4px;padding:1px 6px;")
     hl.addWidget(b); hl.addStretch()
     return hdr, hl
@@ -556,12 +558,12 @@ def _title_block(lay, main_size=56):
         f'</span>'
     )
     lay.addWidget(sub)
-    # Build badge — always shown, text comes from the branch
+    # Build badge — always shown, text and color come from the branch
     badge = QLabel(BUILD_BADGE)
     badge.setFont(font(10, bold=True))
     badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
     badge.setStyleSheet(
-        f"color:{C_ACCENT};background:{C_ACCENT_BG};border:1px solid {C_ACCENT};"
+        f"color:{C_BADGE};background:{C_BADGE_BG};border:1px solid {C_BADGE};"
         "border-radius:4px;padding:2px 10px;"
     )
     bw = QHBoxLayout(); bw.addStretch(); bw.addWidget(badge); bw.addStretch()
