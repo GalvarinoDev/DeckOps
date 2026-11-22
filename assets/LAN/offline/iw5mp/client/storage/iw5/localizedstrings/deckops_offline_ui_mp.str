@@ -1,0 +1,8 @@
+VERSION             "1"
+CONFIG              "C:/trees/cod3/cod3/bin/StringEd.cfg"
+FILENOTES           "DeckOps offline: the in-game CHOOSE CLASS button opens the DeckOps hub (Match Settings)"
+
+REFERENCE           MPUI_CHOOSE_CLASS
+LANG_ENGLISH        "Match Settings"
+
+ENDMARKER
