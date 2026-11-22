@@ -448,6 +448,7 @@ def find_own_installed(extra_paths=None, on_progress=None):
         return {}
 
     found = {}
+    uo_cod1 = {}
     for scan_dir in scan_dirs:
         prog(f"Scanning {scan_dir}...")
         for dirpath, dirnames, filenames in _walk_games(scan_dir):
@@ -456,23 +457,33 @@ def find_own_installed(extra_paths=None, on_progress=None):
                 continue
             # Game root found; skip its subfolders
             dirnames.clear()
-            # A UO folder also ships CoD1's CoDSP/CoDMP; those belong to the CoD1 folder
+            # A UO folder also ships CoD1's CoDSP/CoDMP. A separate CoD1 folder wins,
+            # else CoD1 runs from the UO folder (Deluxe Edition is one folder)
             is_uo = "coduosp.exe" in exes or "coduomp.exe" in exes
             for low, fname in exes.items():
                 for key in _OWN_EXES[low]:
-                    if key in found or (is_uo and key in ("cod1sp", "cod1mp")):
+                    if key in found:
                         continue
                     meta = GAMES[key]
                     # Ghosts SP falls back to the MP exe; use its own when present
                     exe_path = os.path.join(dirpath, exes.get(meta["exe"].lower(), fname))
-                    found[key] = {
+                    hit = {
                         **meta,
                         "install_dir": dirpath,
                         "exe_path":    exe_path,
                         "exe_size":    get_exe_size(exe_path),
                         "source":      "own",
                     }
+                    if is_uo and key in ("cod1sp", "cod1mp"):
+                        uo_cod1.setdefault(key, hit)
+                        continue
+                    found[key] = hit
                     prog(f"  found {key}: {meta['name']} at {dirpath}")
+
+    for key, hit in uo_cod1.items():
+        if key not in found:
+            found[key] = hit
+            prog(f"  found {key}: {hit['name']} at {hit['install_dir']} (UO folder)")
 
     cod3 = find_cod3(scan_dirs)
     if cod3:

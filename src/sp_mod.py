@@ -183,6 +183,10 @@ def build_sp_launch_option(game_key: str) -> str:
     """Launch option for the Steam app or own shortcut. It swaps the original SP exe for iw-pad.exe."""
     from steam_common import prelaunch_prefix, GL_FIX, GL_FIX_KEYS
     fix = GL_FIX if game_key in GL_FIX_KEYS else ""
+    # CoD1 and UO can share a folder (Steam, Deluxe Edition). Own shortcuts don't run as
+    # appid 2620, so tell iw-pad.exe which game to start
+    if game_key == "cod1sp":
+        fix += "IWPAD_EXE=CoDSP.exe "
     return f"{fix}{prelaunch_prefix(game_key)}bash -c 'exec \"${{@/{sp_exe(game_key)}/iw-pad.exe}}\"' -- %command%"
 
 
@@ -190,8 +194,8 @@ if __name__ == "__main__":
     assert build_sp_launch_option("iw4sp").endswith(" iw4sp bash -c 'exec \"${@/iw4sp.exe/iw-pad.exe}\"' -- %command%")
     assert build_sp_launch_option("iw5sp").endswith(" iw5sp bash -c 'exec \"${@/iw5sp.exe/iw-pad.exe}\"' -- %command%")
     o = build_sp_launch_option("cod1sp")
-    assert o.startswith("MESA_EXTENSION_MAX_YEAR=2003 bash ") and o.endswith(" cod1sp bash -c 'exec \"${@/CoDSP.exe/iw-pad.exe}\"' -- %command%"), o
-    assert build_sp_launch_option("coduosp").startswith("MESA_EXTENSION_MAX_YEAR=2003 ")
+    assert o.startswith("MESA_EXTENSION_MAX_YEAR=2003 IWPAD_EXE=CoDSP.exe bash ") and o.endswith(" cod1sp bash -c 'exec \"${@/CoDSP.exe/iw-pad.exe}\"' -- %command%"), o
+    assert build_sp_launch_option("coduosp").startswith("MESA_EXTENSION_MAX_YEAR=2003 bash ")
     assert "MESA" not in build_sp_launch_option("cod2sp")
     assert "${@/CoD2SP_s.exe/iw-pad.exe}" in build_sp_launch_option("cod2sp")
     print("ok")
