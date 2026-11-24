@@ -380,9 +380,10 @@ def find_installed_games(library_folders, steam_root=None):
 
 
 # --- Own installs
-# A game is found by its stock exe, in a folder of any name. Fastfiles aren't
-# checked because a copy can lack a mode: a BO2 copy with only Campaign and
-# Zombies has no t6mp.exe or mp_*.ff.
+# A game is found by its stock exe, in a folder of any name. The exe decides
+# the modes because a copy can lack one: a BO2 copy with only Campaign and
+# Zombies has no t6mp.exe or mp_*.ff. A folder with no stock exe is checked
+# for a map fastfile instead (_OWN_FASTFILES).
 
 # Default scan locations -- case-sensitive on Linux.
 OWN_SCAN_PATHS = [
@@ -405,6 +406,39 @@ for _k, _m in GAMES.items():
     for _e in (_m["exe"], _m.get("exe_alt")):
         if _e:
             _OWN_EXES.setdefault(_e.lower(), []).append(_k)
+
+
+# Copies without the stock exes, like Plutonium's full-game downloads, still
+# have one base-game MP map per game. A match counts every mode of that game.
+# Names match in any case, and "*" matches any folder. MW3 uses Seatown
+# because WaW also ships mp_dome.ff.
+_OWN_FASTFILES = [
+    (("zone", "english", "mp_crash.ff"),   ["cod4mp", "cod4sp"]),
+    (("zone", "english", "mp_asylum.ff"),  ["t4sp", "t4mp"]),
+    (("zone", "english", "mp_rust.ff"),    ["iw4sp", "iw4mp"]),
+    (("zone", "english", "mp_seatown.ff"), ["iw5sp", "iw5mp"]),
+    (("zone", "*", "mp_nuked.ff"),         ["t5sp", "t5mp"]),
+    (("zone", "all", "mp_hijacked.ff"),    ["t6sp", "t6mp", "t6zm"]),
+    (("zone", "mp_infection.ff"),          ["t7"]),
+    (("mp_strikezone.ff",),                ["iw6sp", "iw6mp"]),
+    (("mp_comeback.ff",),                  ["s1sp", "s1mp"]),
+]
+
+
+def _has_path(d, parts):
+    head, rest = parts[0], parts[1:]
+    try:
+        names = os.listdir(d)
+    except OSError:
+        return False
+    return any((head == "*" or n.lower() == head) and (not rest or _has_path(os.path.join(d, n), rest))
+               for n in names)
+
+
+def _fastfile_keys(dirpath, dirnames, filenames):
+    low = {n.lower() for n in dirnames + filenames}
+    return [k for parts, keys in _OWN_FASTFILES
+            if parts[0] in low and _has_path(dirpath, parts) for k in keys if k in GAMES]
 
 
 def _walk_games(root):
@@ -453,32 +487,35 @@ def find_own_installed(extra_paths=None, on_progress=None):
         prog(f"Scanning {scan_dir}...")
         for dirpath, dirnames, filenames in _walk_games(scan_dir):
             exes = {f.lower(): f for f in filenames if f.lower() in _OWN_EXES}
-            if not exes:
+            hits = {k: f for low, f in exes.items() for k in _OWN_EXES[low]}
+            if not hits:
+                # No stock exe here. Shortcut appids come from exe_path, so it points where the exe would be
+                hits = {k: GAMES[k]["exe"] for k in _fastfile_keys(dirpath, dirnames, filenames)}
+            if not hits:
                 continue
             # Game root found; skip its subfolders
             dirnames.clear()
             # A UO folder also ships CoD1's CoDSP/CoDMP. A separate CoD1 folder wins,
             # else CoD1 runs from the UO folder (Deluxe Edition is one folder)
             is_uo = "coduosp.exe" in exes or "coduomp.exe" in exes
-            for low, fname in exes.items():
-                for key in _OWN_EXES[low]:
-                    if key in found:
-                        continue
-                    meta = GAMES[key]
-                    # Ghosts SP falls back to the MP exe; use its own when present
-                    exe_path = os.path.join(dirpath, exes.get(meta["exe"].lower(), fname))
-                    hit = {
-                        **meta,
-                        "install_dir": dirpath,
-                        "exe_path":    exe_path,
-                        "exe_size":    get_exe_size(exe_path),
-                        "source":      "own",
-                    }
-                    if is_uo and key in ("cod1sp", "cod1mp"):
-                        uo_cod1.setdefault(key, hit)
-                        continue
-                    found[key] = hit
-                    prog(f"  found {key}: {meta['name']} at {dirpath}")
+            for key, fname in hits.items():
+                if key in found:
+                    continue
+                meta = GAMES[key]
+                # Ghosts SP falls back to the MP exe; use its own when present
+                exe_path = os.path.join(dirpath, exes.get(meta["exe"].lower(), fname))
+                hit = {
+                    **meta,
+                    "install_dir": dirpath,
+                    "exe_path":    exe_path,
+                    "exe_size":    get_exe_size(exe_path),
+                    "source":      "own",
+                }
+                if is_uo and key in ("cod1sp", "cod1mp"):
+                    uo_cod1.setdefault(key, hit)
+                    continue
+                found[key] = hit
+                prog(f"  found {key}: {meta['name']} at {dirpath}" + ("" if exes else " (map files, no stock exe)"))
 
     for key, hit in uo_cod1.items():
         if key not in found:
