@@ -1406,6 +1406,14 @@ class ConfigureScreen(QWidget):
         sc_fix_btn.setFixedWidth(220); sc_fix_btn.clicked.connect(self._repair_shortcuts)
         left.addWidget(sc_fix_btn)
 
+        # --- Left: Game Configs
+        _head(left, "Game Configs")
+        left.addWidget(_lbl("Copies the DeckOps game settings for your device again. This overwrites changes you made to those files.",
+                            11, C_DIM, align=Qt.AlignmentFlag.AlignLeft))
+        gc_btn = _btn("Re-apply Game Configs", C_DARK_BTN, size=12, h=40)
+        gc_btn.setFixedWidth(220); gc_btn.clicked.connect(self._confirm_game_configs)
+        left.addWidget(gc_btn)
+
         # --- Left: Player Name
         _head(left, "Player Name")
         nr = QHBoxLayout(); nr.setSpacing(12)
@@ -1656,6 +1664,41 @@ class ConfigureScreen(QWidget):
                     s.log.emit("✓  All shortcuts present. It is now safe to reopen Steam.")
             except Exception as ex:
                 s.log.emit(f"✗  Repair failed: {ex}")
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _confirm_game_configs(self):
+        reply = QMessageBox.warning(
+            self, "Re-apply Game Configs",
+            "This copies the DeckOps settings for your device over the config "
+            "files of every game DeckOps set up. Settings you changed in game "
+            "will be lost.\n\nClose all games first. Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self._reapply_game_configs()
+
+    def _reapply_game_configs(self):
+        self.status.setText("Applying game configs...")
+        s = _Sigs()
+        s.log.connect(lambda msg: self.status.setText(msg))
+        def _run():
+            try:
+                from game_config import apply_game_configs
+                from detect_games import find_all_games as _find_all
+                steam_root = cfg.load().get("steam_root", "") or find_steam_root()
+                installed = _find_all(steam_root) if steam_root else {}
+                keys = [k for k in cfg.get_setup_games() if k in installed]
+                applied, skipped, failed = apply_game_configs(
+                    selected_keys=keys, installed_games=installed,
+                    steam_root=steam_root, deck_model=cfg.get_deck_model() or "oled",
+                    on_progress=lambda msg: s.log.emit(msg),
+                )
+                s.log.emit(f"✓  Game configs: {applied} written"
+                           + (f", {skipped} skipped" if skipped else "")
+                           + (f", {failed} failed" if failed else "") + ".")
+            except Exception as ex:
+                s.log.emit(f"✗  Failed: {ex}")
         threading.Thread(target=_run, daemon=True).start()
 
     def _save_name(self):
